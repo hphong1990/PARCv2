@@ -69,7 +69,7 @@ def _calculate_hotspot_metric(Ts, n_timesteps=16):
         hotspot_mask = temp_i > hotspot_threshold
         hotspot_area = np.count_nonzero(hotspot_mask)
 
-        hotspot_area_rescaled = hotspot_area * ((2 * 25 / 485) ** 2)
+        hotspot_area_rescaled = hotspot_area * ((2 * 1.5 / 256) ** 2)
         hotspot_areas.append(hotspot_area_rescaled)
 
         hotspot_temperature = temp_i * hotspot_mask
@@ -156,12 +156,12 @@ def calculate_hotspot_metric_rate_of_change(T_cases, cases_range, n_timesteps):
     hotspot_temperatures = np.array(hotspot_temperatures)
 
     change_hotspot_areas = hotspot_areas[:, 1:] - hotspot_areas[:, 0:-1]
-    change_hotspot_areas = change_hotspot_areas / (0.79)
+    change_hotspot_areas = change_hotspot_areas / (0.17)
 
     change_hotspot_temperatures = (
         hotspot_temperatures[:, 1:] - hotspot_temperatures[:, 0:-1]
     )
-    change_hotspot_temperatures = change_hotspot_temperatures / (0.79)
+    change_hotspot_temperatures = change_hotspot_temperatures / (0.17)
 
     mean_Tdot_temperatures = np.mean(change_hotspot_temperatures, axis=0)
     mean_Tdot_areas = np.mean(change_hotspot_areas, axis=0)
