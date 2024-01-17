@@ -41,6 +41,17 @@ def differentiator_climate(n_state_var=3):
     temp_concat = Concatenate(axis=-1)([advec_temp,diffusion_temp])
     temp_dot = mapping_and_recon[0]([dynamic_feature, temp_concat])
     
+    # Geo-potential
+    advec_poten = advection[1](init_state_var[:, :, :, 1:2], velocity_field)
+    diffusion_poten = diffusion[1](init_state_var[:, :, :, 1:2])
+    poten_concat = Concatenate(axis=-1)([advec_poten,diffusion_poten])
+    poten_dot = mapping_and_recon[1]([dynamic_feature, poten_concat])
+    
+    # Relative humidity
+    advec_humid = advection[2](init_state_var[:, :, :, 2:3], velocity_field)
+    diffusion_humid = diffusion[2](init_state_var[:, :, :, 2:3])
+    humid_concat  = Concatenate(axis=-1)([advec_humid,diffusion_humid])
+
     humid_dot = mapping_and_recon[2]([dynamic_feature, humid_concat])
     
     # Velocity

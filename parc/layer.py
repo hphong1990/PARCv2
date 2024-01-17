@@ -202,63 +202,6 @@ def feature_extraction_unet(input_shape = (128,192), n_out_features = 128, n_bas
     unet = keras.Model(inputs, feature_out)
     return unet
 
-def feature_extraction_climate(input_shape = (128,192), n_out_features = 128, n_base_features = 64, n_channel = 5):
-    inputs = keras.Input(shape = (input_shape[0], input_shape[1],n_channel))
-    inputs_norm = BatchNormalization()(inputs)
-    conv1 = conv_block_down(inputs_norm,
-                            feat_dim = n_base_features,
-                            reps = 1,
-                            kernel_size = 3)
-    conv2 = conv_block_down(conv1,
-                            feat_dim = n_base_features*2,
-                            reps = 1,
-                            kernel_size = 3,
-                            mode = 'down')
-    conv3 = conv_block_down(conv2,
-                            feat_dim = n_base_features*4,
-                            reps = 1,
-                            kernel_size = 3,
-                            mode = 'down')
-    conv4 = conv_block_down(conv3,
-                            feat_dim = n_base_features*8,
-                            reps = 1,
-                            kernel_size = 3,
-                            mode = 'normal')
-    conv5 = conv_block_down(conv4,
-                            feat_dim = n_base_features*16,
-                            reps = 1,
-                            kernel_size = 3,
-                            mode = 'normal')
-    conv6 = conv_block_up_wo_concat(conv5,
-                                    feat_dim = n_base_features*8,
-                                    reps = 1,
-                                    kernel_size = 3,
-                                    mode = 'normal')
-    conv7 = conv_block_up_w_concat(conv6, conv3,
-                                    feat_dim = n_base_features*4,
-                                    reps = 1,
-                                    kernel_size = 3,
-                                    mode = 'normal')
-    conv8 = conv_block_up_wo_concat(conv7,
-                                    feat_dim = n_base_features*2,
-                                    reps = 1,
-                                    kernel_size = 3,
-                                    mode = 'up')
-    
-    conv9 = conv_block_up_w_concat(conv8, conv1,
-                                    feat_dim = n_out_features,
-                                    reps = 1,
-                                    kernel_size = 3,
-                                    mode = 'up')
-
-    feature_out = conv_block_up_wo_concat(conv9,
-                                    feat_dim = n_out_features,
-                                    reps = 1,
-                                    kernel_size = 1,
-                                    mode = 'normal')
-    unet = keras.Model(inputs, feature_out)
-    return unet
-
 def feature_extraction_burgers(input_shape = (128,192), n_out_features = 64, n_base_features = 64, n_channel = 5):
     inputs = keras.Input(shape = (input_shape[0], input_shape[1],n_channel))
     # Need to put normalization layer
@@ -295,6 +238,8 @@ def feature_extraction_burgers(input_shape = (128,192), n_out_features = 64, n_b
     unet = keras.Model(inputs, feature_out)
     return unet
 
+
+
 class Advection(layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -316,15 +261,17 @@ class Diffusion(layers.Layer):
         laplacian = tf.add(dyy,dxx)
         return laplacian
     
-class Divergence(layers.Layer):
+class Poisson(layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def call(self, vector_field):
         uy, ux = tf.image.image_gradients(vector_field[0])
         vy, vx = tf.image.image_gradients(vector_field[1])
-        div = tf.add(ux,vy)
-        return div
+        ux2 = tf.multiply(ux,ux)
+        vy2 = tf.multiply(vy,vy)
+        uyvx = tf.multiply(uy,vx)
+        return ux2,vy2,uyvx
 
 def mapping_and_recon_cnn(input_shape = (128,192), n_base_features = 128, n_mask_channel = 1, output_channel = 1 ):
     inputs = keras.Input(shape = (input_shape[0], input_shape[1], n_base_features), dtype = tf.float32)
