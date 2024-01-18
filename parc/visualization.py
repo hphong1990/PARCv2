@@ -676,3 +676,194 @@ def plot_saliency_map(saliency_mask, microstructure):
     mimg = Image.open("microstructure.png")
     result = Image.blend(simg, mimg, alpha=0.3)
     display(result)
+
+def plot_field_evolution_burgers(y_pred, y_true, case_id):
+    """Visualize the prediction
+    :param y_pred:          (numpy) predicted fields
+                            [0, ...] predicted fields (F)
+                            [1, ...] predicted change of fields (F_dot)
+    :param y_true:          (numpy) true label of the fields
+    :param test_sample_no:  (int)   array index to select the test case
+    :state_var_type:        (str)   indicate which fields to plot the result to apply correct scaling
+    """
+
+    # get correct scaling terms
+    unit = 'cm/s'
+    step = 10
+    # plot the prediction results
+    x_num = np.linspace(0, 2, 101)  # discrete timesteps
+    fig, ax = plt.subplots(6, 6, figsize=(18, 19.2))
+    fig.suptitle('Velocity field evolution: $u = \sqrt{u_x^2 + u_y^2}$\nR = 6500, a = 0.85, w = 0.95', fontsize=22)
+    plt.subplots_adjust(wspace=0.06, hspace=-0.07, top=0.9)
+    for i in range(6):
+        ax[0][i].clear()
+        ax[0][i].clear()
+        ax[0][i].set_xticks([])
+        ax[0][i].set_yticks([])
+        im = ax[0][i].imshow(
+            np.squeeze(np.sqrt(y_true[case_id, :, :, (i)* 3 * step + 0]**2 + y_true[case_id, :, :, (i)* 3 * step + 1]**2)),
+            cmap="jet",
+            vmin=0,
+            vmax=1.2,
+        )
+        ax[0][i].set_title(("t = " + "%.2f" % x_num[i * step *2] + " (s)"), fontsize=22)
+        
+        for j in range(5):
+            ax[j+1][i].set_xticks([])
+            ax[j+1][i].set_yticks([])
+            ax[j+1][i].imshow(
+                np.squeeze(np.sqrt(y_pred[j][case_id, :, :, (i)* 3 * step + 0]**2 + y_pred[j][case_id, :, :, (i)* 3 * step + 1]**2)),
+                cmap="jet",
+                vmin=0,
+                vmax=1.2,
+            )
+    ax[0][0].set_ylabel("Ground truth", fontsize=22)
+    ax[1][0].set_ylabel("PARCv2", fontsize=22)
+    ax[2][0].set_ylabel("PARC\n(NeuralODE)", fontsize=22)
+    ax[3][0].set_ylabel("FNO", fontsize=22)
+    ax[4][0].set_ylabel("PhyCRNet", fontsize=22)
+    ax[5][0].set_ylabel("PI-FNO", fontsize=22)
+    fig.subplots_adjust(right=0.95)
+    
+    cbar_ax = fig.add_axes([0.96, 0.120, 0.025, 0.772])
+    norm = mpl.colors.Normalize(vmin=0, vmax=1.2)
+    cbar = fig.colorbar(
+        mpl.cm.ScalarMappable(norm=norm, cmap="jet"), cax=cbar_ax, ax=im
+    )
+    cbar.set_label(label=unit, weight="bold", fontsize=20)
+    cbar.ax.tick_params(labelsize=20)
+    plt.show()
+
+def plot_field_evolution_ns(y_pred, y_true, case_id):
+    """Visualize the prediction
+    :param y_pred:          (numpy) predicted fields
+                            [0, ...] predicted fields (F)
+                            [1, ...] predicted change of fields (F_dot)
+    :param y_true:          (numpy) true label of the fields
+    :param test_sample_no:  (int)   array index to select the test case
+    :state_var_type:        (str)   indicate which fields to plot the result to apply correct scaling
+    """
+
+    # get correct scaling terms
+    step = 12
+    max_val = np.amax(np.sqrt(y_true[3,:,:,0::3]**2 + y_true[3,:,:,1::3]**2))   # min temperature (K)
+    min_val = 0  # max temperature (K)
+    unit = "(m/s)"
+    # plot the prediction results
+    x_num = np.linspace(0, 2, 38)  # discrete timesteps
+    # print(x_num)
+    fig, ax = plt.subplots(6,4, figsize=(27, 22.5))
+    fig.suptitle('Velocity field evolution: $u = \sqrt{u_x^2 + u_y^2}$\nRe = 350', fontsize=32)
+    plt.subplots_adjust(wspace=0.06, hspace= 0.06, top=0.9)
+    for i in range(4):
+        ax[0][i].clear()
+        ax[0][i].clear()
+        ax[0][i].set_xticks([])
+        ax[0][i].set_yticks([])
+        im = ax[0][i].imshow(
+            np.squeeze(np.sqrt(y_true[case_id, :, :, (i * step + 1) * 3 + 0]**2 + y_true[case_id, :, :, (i * step + 1) * 3 + 1]**2)),
+            cmap="bwr",
+            vmin=0,
+            vmax=max_val,
+        )
+        ax[0][i].set_title(("t = " + "%.2f" % x_num[i * step + 1] + " (s)"), fontsize = 28)  
+        for j in range(5):
+            ax[j+1][i].imshow(
+                np.squeeze(np.sqrt(y_pred[j][case_id, :, :, (i * step + 1) * 3 + 0]**2 + y_pred[j][case_id, :, :, (i * step + 1) * 3 + 1]**2)),
+                cmap="bwr",
+                vmin=0,
+                vmax=max_val,
+            )
+    ax[0][0].set_ylabel("Ground truth", fontsize=28)
+    ax[1][0].set_ylabel("PARCv2", fontsize=28)
+    ax[2][0].set_ylabel("PARC\n(NeuralODE)", fontsize=28)
+    ax[3][0].set_ylabel("FNO", fontsize=28)
+    ax[4][0].set_ylabel("PhyCRNet", fontsize=28)
+    ax[5][0].set_ylabel("PI-FNO", fontsize=28)
+    fig.subplots_adjust(right=0.95)
+    
+    cbar_ax = fig.add_axes([0.96, 0.113, 0.025, 0.784])
+    norm = mpl.colors.Normalize(vmin=min_val, vmax=max_val)
+    cbar = fig.colorbar(
+        mpl.cm.ScalarMappable(norm=norm, cmap="bwr"), cax=cbar_ax, ax=im
+    )
+    cbar.set_label(label=unit, weight="bold", fontsize=26)
+    cbar.ax.tick_params(labelsize=26)
+    # fig.savefig('field_evolution_plot_ns.png',bbox_inches='tight')
+    plt.show()
+
+def plot_field_evolution_em(y_pred, y_true, case_id, options):
+    """Visualize the prediction
+    :param y_pred:          (numpy) predicted fields
+                            [0, ...] predicted fields (F)
+                            [1, ...] predicted change of fields (F_dot)
+    :param y_true:          (numpy) true label of the fields
+    :param test_sample_no:  (int)   array index to select the test case
+    :state_var_type:        (str)   indicate which fields to plot the result to apply correct scaling
+    """
+
+    # get correct scaling terms
+    # opts_2 = 0
+    step = 3
+    
+    if options == "temperature":
+        
+        min_val = 300  # min temperature (K)
+        max_val = 5000  # max temperature (K)
+        opts = 0
+        unit = "(K)"
+    else:
+        min_val = np.amin(y_true[:,:,:,1::5])*1e-9  # min temperature (K)
+        max_val = np.amax(y_true[:,:,:,1::5])*1e-9  # max temperature (K)
+        unit = "(GPa)"
+        opts = 1
+
+    # print(X.shape)
+    # plot the prediction results
+    x_num = np.linspace(0, 2.38, 14)  # discrete timesteps
+    print(x_num)
+    fig, ax = plt.subplots(4, 5, figsize=(18, 10.2))
+    if options == "temperature":
+        fig.suptitle('Temperature field evolution', fontsize=28)
+    else:
+        fig.suptitle('Pressure field evolution', fontsize=28)
+        
+    plt.subplots_adjust(wspace=0.06, hspace= 0.07, top=0.9)
+    for i in range(5):
+        ax[0][i].clear()
+        ax[0][i].clear()
+        ax[0][i].set_xticks([])
+        ax[0][i].set_yticks([])
+        im = ax[0][i].imshow(
+            np.squeeze(y_true[case_id, :, :192, ((i) * step + 1)*5 + opts]*1e-9),
+            cmap="jet",
+            vmin=min_val,
+            vmax=max_val,
+        )
+        ax[0][i].set_title(("t = " + "%.2f" % x_num[i * step + 1] + " (ns)"), fontsize=22)
+        
+        for j in range(3):
+            ax[j+1][i].set_xticks([])
+            ax[j+1][i].set_yticks([])
+            ax[j+1][i].imshow(
+                np.squeeze(y_pred[j][case_id, :, :192, (i* step) * 5 + opts]*1e-9),
+                cmap="jet",
+                vmin=min_val,
+                vmax=max_val,
+            )
+            
+    ax[0][0].set_ylabel("Ground truth", fontsize=22)
+    ax[1][0].set_ylabel("PARCv2", fontsize=22)
+    ax[2][0].set_ylabel("PARC\n(NeuralODE)", fontsize=22)
+    ax[3][0].set_ylabel("FNO", fontsize=22)
+    fig.subplots_adjust(right=0.95)
+    
+    cbar_ax = fig.add_axes([0.96, 0.111, 0.025, 0.788])
+    norm = mpl.colors.Normalize(vmin=min_val, vmax=max_val)
+    cbar = fig.colorbar(
+        mpl.cm.ScalarMappable(norm=norm, cmap="jet"), cax=cbar_ax, ax=im
+    )
+    cbar.set_label(label=unit, weight="bold", fontsize=20)
+    cbar.ax.tick_params(labelsize=20)
+    fig.savefig('field_evolution_plot_press_em.png',bbox_inches='tight')
+    plt.show()

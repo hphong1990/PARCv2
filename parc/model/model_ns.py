@@ -74,7 +74,7 @@ def integrator():
                             kernel_size = 5,
                             mode = 'up')
     conv_out = Conv2D(2,3, padding='same')(conv3)
-    state_var_next = state_var_prev + conv_out 
+    state_var_next = Add()([state_var_prev, conv_out])
     integrator = keras.Model([state_var_dot, state_var_prev], [state_var_next], name = 'integrator')
     return integrator
 
@@ -96,6 +96,19 @@ class PARCv2_ns(keras.Model):
             self.poisson.trainable = False
         else:
             self.integrator.trainable = False
+
+        self.input_layer = keras.layers.Input((128, 256, 3))
+        self.out = self.call(self.input_layer)
+        
+        super(PARCv2_ns, self).__init__(
+            inputs= self.input_layer, outputs=self.out, **kwargs
+        )
+    
+    def build(self):
+        self._is_graph_network = True
+        self._init_graph_network(
+            inputs=[self.input_layer], outputs=self.out
+        )
 
     @property
     def metrics(self):
