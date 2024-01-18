@@ -22,6 +22,7 @@ def differentiator_burgers():
     velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (64,64), n_base_features = 64, n_mask_channel=4, output_channel=2)
 
     # Main computation graph
+    # Input layer
     velocity_field = Input(shape=(64,64, 3), dtype = tf.float32)
 
     # Reaction term
@@ -45,11 +46,14 @@ def differentiator_burgers():
     return differentiator
 
 def integrator_burgers():
+    # Model initiation
     velocity_integrator = layer.integrator_cnn(input_shape = (64,64), n_base_features = 64, n_output=2)
 
+    # Input layer
     velocity_prev = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
     velocity_dot = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
 
+    # Data driven integrator
     velocity_next = velocity_integrator([velocity_dot, velocity_prev])
     integrator = keras.Model([velocity_dot, velocity_prev], [velocity_next], name = 'integrator')
     return integrator
@@ -70,6 +74,20 @@ class PARCv2_burgers(keras.Model):
             self.differentiator.trainable = False
         else:
             self.integrator.trainable = False
+
+        self.input_layer = keras.layers.Input((64, 64, 3))
+        self.out = self.call(self.input_layer)
+        
+        super(PARCv2_burgers, self).__init__(
+            inputs=self.input_layer, outputs=self.out, **kwargs
+        )
+    
+    def build(self):
+        self._is_graph_network = True
+        self._init_graph_network(
+            inputs=[self.input_layer], outputs=self.out
+        )
+
 
     @property
     def metrics(self):

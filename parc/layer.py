@@ -53,16 +53,25 @@ def resnet_block(x_in, feat_dim, kernel_size, reps, pooling = True):
     else:
         return x
 
-def conv_unit(feat_dim, kernel_size, x):
-    x = Conv2D(feat_dim, 
+def conv_unit(feat_dim, kernel_size, x_in):
+    """
+    Conv unit: x_in --> Conv k x k + relu --> Conv 1 x 1 + relu --> output
+    Parameter: 
+                - x_in (tensor): input tensor
+                - feat_dim (int): number of channels
+                - kernel_size (k) (int): size of convolution kernel
+    Return:
+                - (tensor): output of the conv unit
+    """
+    conv = Conv2D(feat_dim, 
                kernel_size, 
                activation = LeakyReLU(0.2), 
-               padding="same")(x)
-    x = Conv2D(feat_dim,
+               padding="same")(x_in)
+    conv_out = Conv2D(feat_dim,
                1,
                activation = LeakyReLU(0.2),
-               padding="same")(x)
-    return x
+               padding="same")(conv)
+    return conv_out
 
 def conv_block_down(x, feat_dim, reps, kernel_size, mode = 'normal'):
     if mode == 'down':
@@ -94,6 +103,10 @@ def conv_block_up_wo_concat(x, feat_dim, reps, kernel_size, mode = 'normal'):
     return x
 
 class SPADE(layers.Layer):
+    """
+    Implementation of Spatially-Adaptive Normalization layer
+    
+    """
     def __init__(self, filters, epsilon=1e-5, **kwargs):
         super().__init__(**kwargs)
         self.epsilon = epsilon
@@ -103,7 +116,6 @@ class SPADE(layers.Layer):
 
     def build(self, input_shape):
         self.resize_shape = input_shape[1:3]
-        # print(self.resize_shape)
 
     def call(self, input_tensor, raw_mask):
         with tf.device('/GPU:0'):
@@ -122,6 +134,11 @@ class SPADE(layers.Layer):
         return output
 
 def spade_generator_unit(x, mask, feats_out, kernel, upsampling = True):
+    """
+    SPADE block: x_in -> GaussianNoise ---> (SPADE + Relu + Conv) x 2 -----> upsampling (optional) --> output
+                                        |                               |
+                                         ---- (SPADE + Relu + Conv) ----
+    """
     x = GaussianNoise(0.05)(x)
     
     # Residual SPADE & conv
@@ -193,7 +210,6 @@ def feature_extraction_unet(input_shape = (128,192), n_out_features = 128, n_bas
                                     reps = 1,
                                     kernel_size = 3,
                                     mode = 'up')
-
     feature_out = conv_block_up_wo_concat(conv9,
                                     feat_dim = n_out_features,
                                     reps = 1,
@@ -256,8 +272,8 @@ class Diffusion(layers.Layer):
 
     def call(self, state_variable):
         dy, dx = tf.image.image_gradients(state_variable)
-        dyy, dyx = tf.image.image_gradients(dy)
-        dxy, dxx = tf.image.image_gradients(dx)
+        dyy, _ = tf.image.image_gradients(dy)
+        _ , dxx = tf.image.image_gradients(dx)
         laplacian = tf.add(dyy,dxx)
         return laplacian
     
