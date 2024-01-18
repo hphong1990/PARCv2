@@ -22,7 +22,7 @@ def differentiator_burgers():
     velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (64,64), n_base_features = 64, n_mask_channel=4, output_channel=2)
 
     # Main computation graph
-    velocity_field = Input(shape=(64 , 64, 3), dtype = tf.float32)
+    velocity_field = Input(shape=(64,64, 3), dtype = tf.float32)
 
     # Reaction term
     dynamic_feature = feature_extraction(velocity_field)
@@ -41,21 +41,22 @@ def differentiator_burgers():
     # Final mapping
     velocity_dot = velocity_mapping_and_recon([dynamic_feature, advec_diff_concat])
     
-    differentiator = Model(velocity_field, velocity_dot)
+    differentiator = Model(velocity_field, velocity_dot, name = 'differentiator')
     return differentiator
 
 def integrator_burgers():
     velocity_integrator = layer.integrator_cnn(input_shape = (64,64), n_base_features = 64, n_output=2)
 
-    velocity_prev = keras.layers.Input(shape = (64, 64, 2), dtype = tf.float32)
-    velocity_dot = keras.layers.Input(shape = (64, 64, 2), dtype = tf.float32)
+    velocity_prev = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
+    velocity_dot = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
 
     velocity_next = velocity_integrator([velocity_dot, velocity_prev])
-    integrator = keras.Model([velocity_dot, velocity_prev], [velocity_next])
+    integrator = keras.Model([velocity_dot, velocity_prev], [velocity_next], name = 'integrator')
     return integrator
 
+@keras.saving.register_keras_serializable()
 class PARCv2_burgers(keras.Model):
-    def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, differentiator_backbone = 'em', **kwargs):
+    def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, **kwargs):
         super(PARCv2_burgers, self).__init__(**kwargs)
         self.n_time_step = n_time_step
         self.step_size = step_size
@@ -76,22 +77,21 @@ class PARCv2_burgers(keras.Model):
         self.total_loss_tracker,
         ]
     
-    def call(self, input):
-        state_var_init = tf.cast(input[0],dtype = tf.float32)
-        velocity_init = tf.cast(input[1], dtype = tf.float32)
-        input_seq = Concatenate(axis = -1)([state_var_init, velocity_init])
+    def call(self, input_tensor):
+        input_seq_current = tf.cast(input_tensor,dtype = tf.float32)
 
-        input_seq_current = input_seq
-
-        res = []
+        res = [] 
+        res.append(input_seq_current)
         for _ in range(self.n_time_step):    
-            input_seq_current, update = self.explicit_update(input_seq_current)
+            velocity_next, update = self.explicit_update(input_seq_current)
             if self.use_data_driven_int == True:
-                state_var_next, velocity_next = self.integrator([update[:,:,:,:3],update[:,:,:,3:],input_seq_current[:,:,:,:3], input_seq_current[:,:,:,3:]])
-                input_seq_current = Concatenate()([state_var_next, velocity_next])
-                        
+                velocity_next_hyper = self.integrator([update, velocity_next[:,:,:,:2]])
+                input_seq_current = Concatenate()([velocity_next_hyper, velocity_next[:,:,:,2:]])
+            else:
+                input_seq_current = velocity_next
             res.append(input_seq_current)
-        return res
+        output = tf.concat(res,axis = -1)
+        return output
 
     @tf.function
     def train_step(self, data):
@@ -103,14 +103,14 @@ class PARCv2_burgers(keras.Model):
             if self.mode == "integrator_training":
                 for ts in range(self.n_time_step):
                     # Compute k1
-                    input_seq_current, update = self.explicit_update(input_seq_current)
-                    velocity_next = self.integrator([update, input_seq_current])
-                    input_seq_current = Concatenate(axis = -1)([velocity_next,velocity_init[:,:,:,2:]])
+                    velocity_next, update = self.explicit_update(input_seq_current)
+                    velocity_next_hyper = self.integrator([update, velocity_next[:,:,:,:2]])
+                    input_seq_current = Concatenate(axis = -1)([velocity_next_hyper,velocity_next[:,:,:,2:]])
                 
             else: 
-                velocity_next, update = self.explicit_update(input_seq_current)
+                input_seq_current, update = self.explicit_update(input_seq_current)
 
-            total_loss  = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(input_seq_current,velocity_gt)
+            total_loss  = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(input_seq_current[:,:,:,:2],velocity_gt[:,:,:,:2])
                            
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -168,11 +168,15 @@ class PARCv2_burgers(keras.Model):
         k1 = self.differentiator(input_seq_current)
 
         # Compute k2
-        inp_k2 = input_seq_current + self.step_size*k1 
+        inp_k2 = input_seq_current[:,:,:,:2] + self.step_size*k1 
+        inp_k2 = Concatenate(axis = -1)([inp_k2,input_seq_current[:,:,:,2:]])
+
         k2 = self.differentiator(inp_k2)
         
         update = 1/2*(k1 + k2)
-        input_seq_current = input_seq_current + self.step_size*update 
+
+        final_states = input_seq_current[:,:,:,:2] + self.step_size*update 
+        input_seq_current = Concatenate(axis = -1)([final_states,input_seq_current[:,:,:,2:]])
 
         return input_seq_current, update
     
