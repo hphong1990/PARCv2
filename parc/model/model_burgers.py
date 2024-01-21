@@ -58,7 +58,7 @@ def integrator_burgers():
     integrator = keras.Model([velocity_dot, velocity_prev], [velocity_next], name = 'integrator')
     return integrator
 
-@keras.saving.register_keras_serializable()
+# @keras.saving.register_keras_serializable()
 class PARCv2_burgers(keras.Model):
     def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, **kwargs):
         super(PARCv2_burgers, self).__init__(**kwargs)
@@ -100,14 +100,18 @@ class PARCv2_burgers(keras.Model):
 
         res = [] 
         res.append(input_seq_current)
-        for _ in range(self.n_time_step):    
-            velocity_next, update = self.explicit_update(input_seq_current)
-            if self.use_data_driven_int == True:
+        
+        if self.use_data_driven_int == True:
+            for _ in range(self.n_time_step):    
+                velocity_next, update = self.explicit_update(input_seq_current)
                 velocity_next_hyper = self.integrator([update, velocity_next[:,:,:,:2]])
-                input_seq_current = Concatenate()([velocity_next_hyper, velocity_next[:,:,:,2:]])
-            else:
+                input_seq_current = Concatenate(axis = -1)([velocity_next_hyper, velocity_next[:,:,:,2:]])
+                res.append(input_seq_current)
+        else:
+            for _ in range(self.n_time_step):  
+                velocity_next, update = self.explicit_update(input_seq_current)
                 input_seq_current = velocity_next
-            res.append(input_seq_current)
+                res.append(input_seq_current)
         output = tf.concat(res,axis = -1)
         return output
 
@@ -118,17 +122,23 @@ class PARCv2_burgers(keras.Model):
 
         input_seq_current = velocity_init
         with tf.GradientTape() as tape:
+            output_snap = []
             if self.mode == "integrator_training":
-                for ts in range(self.n_time_step):
-                    # Compute k1
+                for _ in range(self.n_time_step):
                     velocity_next, update = self.explicit_update(input_seq_current)
                     velocity_next_hyper = self.integrator([update, velocity_next[:,:,:,:2]])
-                    input_seq_current = Concatenate(axis = -1)([velocity_next_hyper,velocity_next[:,:,:,2:]])
-                
-            else: 
-                input_seq_current, update = self.explicit_update(input_seq_current)
+                    input_seq_current = Concatenate(axis = -1)([velocity_next_hyper, velocity_init[:,:,:,2:]])
+                    input_seq_current = tf.clip_by_value(input_seq_current,0,1)
+                    output_snap.append(input_seq_current[:,:,:,:2])
+            else:
+                for _ in range(self.n_time_step):
+                    velocity_next, update = self.explicit_update(input_seq_current)
+                    input_seq_current = velocity_next
+                    input_seq_current = tf.clip_by_value(input_seq_current,0,1)
+                    output_snap.append(input_seq_current[:,:,:,:2])
 
-            total_loss  = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(input_seq_current[:,:,:,:2],velocity_gt[:,:,:,:2])
+            velocity_pred = Concatenate(axis = -1)(output_snap)
+            total_loss  = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(velocity_pred[:,:,:,:],velocity_gt[:,:,:,:])
                            
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))

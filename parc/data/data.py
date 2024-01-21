@@ -30,12 +30,12 @@ class EnergeticMatDataPipeLine:
                         j_range = num_time_steps - sequence_length
                     else:
                         j_range = 1
-                    state_seq_case = [np.concatenate([raw_data[:, :, :256, (j + k) * (n_state_var + 2):\
+                    state_seq_case = [np.concatenate([raw_data[:, :, :192, (j + k) * (n_state_var + 2):\
                                                             (j + k) * (n_state_var + 2) + n_state_var] \
                                                             for k in range(sequence_length)], axis=-1) \
                                                             for j in range  (j_range)] 
 
-                    vel_seq_case = [np.concatenate([raw_data[:, :, :256, (j + k) * (n_state_var + 2) +  n_state_var :\
+                    vel_seq_case = [np.concatenate([raw_data[:, :, :192, (j + k) * (n_state_var + 2) +  n_state_var :\
                                                             (j + k) * (n_state_var + 2) + n_state_var + 2] \
                                                             for k in range(sequence_length)], axis=-1) \
                                                             for j in range (j_range)] 
