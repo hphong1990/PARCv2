@@ -151,7 +151,6 @@ class PARCv2_ns(keras.Model):
         with tf.GradientTape() as tape:
             if self.mode == "integrator_training":
                 output_snap = []
-
                 for ts in range(self.n_time_step):
                     pressure = self.poisson(input_seq_current)
                     input_seq_current = Concatenate(axis = -1)([input_seq_current[:,:,:,:2], pressure])
