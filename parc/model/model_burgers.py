@@ -75,18 +75,18 @@ class PARCv2_burgers(keras.Model):
         else:
             self.integrator.trainable = False
 
-    #     self.input_layer = keras.layers.Input((64, 64, 3))
-    #     self.out = self.call(self.input_layer)
+        self.input_layer = keras.layers.Input((64, 64, 3))
+        self.out = self.call(self.input_layer)
         
-    #     super(PARCv2_burgers, self).__init__(
-    #         inputs=self.input_layer, outputs=self.out, **kwargs
-    #     )
+        super(PARCv2_burgers, self).__init__(
+            inputs=self.input_layer, outputs=self.out, **kwargs
+        )
     
-    # def build(self):
-    #     self._is_graph_network = True
-    #     self._init_graph_network(
-    #         inputs=[self.input_layer], outputs=self.out
-    #     )
+    def build(self):
+        self._is_graph_network = True
+        self._init_graph_network(
+            inputs=[self.input_layer], outputs=self.out
+        )
 
 
     @property
