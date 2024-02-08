@@ -84,7 +84,6 @@ def integrator(n_state_var = 3):
     integrator = keras.Model([state_var_dot, velocity_dot, state_var_prev, velocity_prev], [state_var_next, velocity_next])
     return integrator
 
-@keras.saving.register_keras_serializable()
 class PARCv2(keras.Model):
     def __init__(self, n_state_var, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, differentiator_backbone = 'em', **kwargs):
         super(PARCv2, self).__init__(**kwargs)
@@ -103,8 +102,8 @@ class PARCv2(keras.Model):
         else:
             self.integrator.trainable = False
         
-        self.input_layer1 = keras.layers.Input((128, 256, 3))
-        self.input_layer2 = keras.layers.Input((128, 256, 2))
+        self.input_layer1 = keras.layers.Input((128, 192, 3))
+        self.input_layer2 = keras.layers.Input((128, 192, 2))
         self.out = self.call([self.input_layer1, self.input_layer2])
         
         super(PARCv2, self).__init__(
@@ -151,21 +150,26 @@ class PARCv2(keras.Model):
 
         input_seq_current = input_seq
         with tf.GradientTape() as tape:
+            state_whole = []
+            vel_whole = []
             if self.mode == "integrator_training":
                 for ts in range(self.n_time_step):
                     # Compute k1
                     input_seq_current, update = self.explicit_update(input_seq_current)
                     state_var_next, velocity_next = self.integrator([update[:,:,:,:3],update[:,:,:,3:],input_seq_current[:,:,:,:3], input_seq_current[:,:,:,3:]])
                     input_seq_current = Concatenate()([state_var_next, velocity_next])
-                
+                    state_whole.append(state_var_next)
+                    vel_whole.append(velocity_next)
             else: 
-                input_seq_current, update = self.explicit_update(input_seq_current)
-
-            state_var_next = input_seq_current[:,:,:,:3]
-            velocity_next = input_seq_current[:,:,:,3:]
+                for ts in range(self.n_time_step):
+                    input_seq_current, update = self.explicit_update(input_seq_current)
+                    state_whole.append( input_seq_current[:,:,:,:3])
+                    vel_whole.append(input_seq_current[:,:,:,3:])
+            state_pred = Concatenate(axis = -1)(state_whole)
+            vel_pred = Concatenate(axis = -1)(vel_whole)
                     
-            total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_var_next,state_var_gt) + 
-                            tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(velocity_next,velocity_gt))/2
+            total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_pred,state_var_gt) + 
+                            tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(vel_pred,velocity_gt))/2
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
