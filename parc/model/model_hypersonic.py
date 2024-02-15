@@ -10,30 +10,34 @@ from tensorflow.keras.models import Model
 """
 Differentiator for hypersonic flow problem: 
     - state vars: density, pressure
-    - there is no constant field using
+    - there is no constant field
 """
 DATA_SHAPE = (112, 176)
 
-def differentiator_em(n_state_var=2):
+def differentiator_em(n_state_var=2, padding="SYMMETRIC"):
     # Model initiation
     feature_extraction = layer.feature_extraction_unet(input_shape=DATA_SHAPE,
-                                                       n_channel=n_state_var+2)
+                                                       n_channel=n_state_var+2,
+                                                       padding=padding)
     
     mapping_and_recon = []
     # rho_dot: n_mask_channel=2 because of advec+diff
     mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE,
                                                          n_mask_channel=2, 
-                                                         output_channel=1))
+                                                         output_channel=1,
+                                                         padding=padding))
     # p_dot: n_mask_channel=1 because of no diffusion
     mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE,
                                                          n_mask_channel=1,
-                                                         output_channel=1))
+                                                         output_channel=1,
+                                                         padding=padding))
     
     advection = [layer.Advection() for _ in range(n_state_var+2)]
     diffusion = layer.Diffusion()
     velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE,
                                                              n_mask_channel=2,
-                                                             output_channel=2)
+                                                             output_channel=2,
+                                                             padding=padding)
 
     # Main computation graph
     input_tensor = Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], n_state_var+2), 
@@ -69,18 +73,19 @@ def differentiator_em(n_state_var=2):
     return differentiator
 
 
-def integrator(n_state_var=2):
+def integrator(n_state_var=2, padding="SYMMETRIC"):
     state_var_prev = keras.layers.Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], n_state_var+2), 
                                         dtype=tf.float32)
     state_var_dot = keras.layers.Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], n_state_var+2), 
                                        dtype=tf.float32)
     conv = layer.conv_block_down(state_var_dot, feat_dim=64, reps=1, kernel_size=5,
-                                 mode='down')
+                                 mode='down', padding=padding)
     conv2 = layer.conv_block_down(conv, feat_dim=128, reps=1, kernel_size=5, 
-                                  mode='normal')
+                                  mode='normal', padding=padding)
     conv3 = layer.conv_block_up_wo_concat(conv2, feat_dim=64, reps=1, kernel_size=5,
-                                          mode='up')
-    conv_out = Conv2D(n_state_var+2, 3, padding='same')(conv3)
+                                          mode='up', padding=padding)
+    conv3 = tf.pad(conv3, tf.constant([[0, 0], [1, 1], [1, 1], [0, 0]]), padding)
+    conv_out = Conv2D(n_state_var+2, 3, padding='valid')(conv3)
     state_var_next = Add()([state_var_prev, conv_out])
     integrator = keras.Model([state_var_dot, state_var_prev], [state_var_next], 
                              name='integrator')
@@ -184,11 +189,14 @@ class PARCv2(keras.Model):
         velocity_gt = tf.cast(data[1][1], dtype = tf.float32)
 
         input_seq_current = input_seq
+        #boundary_condition = input_seq_current[:, 0, 0, :]
         res = []
         for ts in range(self.n_time_step):
             input_seq_current, update = self.explicit_update(input_seq_current)
             if self.mode == "integrator_training":
                 input_seq_current = self.integrator([update, input_seq_current])
+            # Boundary condition reset
+            #input_seq_current[:, :, 0, :] = boundary_condition[:, None, :]
             res.append(input_seq_current)
         res = tf.stack(res, axis=1)
         state_var_next = res[:,:,:,:,:2]
@@ -211,10 +219,33 @@ class PARCv2(keras.Model):
             input_seq_current, update = self.heun_update(input_seq_current)
         elif self.solver == 'ode3':
             input_seq_current, update = self.ode3_update(input_seq_current)
+        elif self.solver == "dormand_prince":
+            input_seq_current, update = self.dormand_prince_update(input_seq_current)
         else:
             input_seq_current, update = self.euler_update(input_seq_current)
 
         return input_seq_current, update
+
+    def dormand_prince_update(self, input_seq_current):
+        '''
+        Dormand-Prince method, the same method behind Matlab solve ode5. 5th order.
+        '''
+        input_seq_current = tf.clip_by_value(input_seq_current, 0, 1)
+        k1 = self.differentiator(input_seq_current)
+        k2 = self.differentiator(input_seq_current + 1/5 * self.step_size * k1)
+        inp_k3 = input_seq_current + (3/40 * k1 + 9/40 * k2) * self.step_size
+        k3 = self.differentiator(inp_k3)
+        inp_k4 = input_seq_current + (44/45 * k1 - 56/15 * k2 + 32/9 * k3) * self.step_size
+        k4 = self.differentiator(inp_k4)
+        inp_k5 = input_seq_current + (19372/6561 * k1 - 25360/2187 * k2 + 64448/6561 * k3 - 212/729 * k4) * self.step_size
+        k5 = self.differentiator(inp_k5)
+        inp_k6 = input_seq_current + (9017/3168 * k1 - 355/33 * k2 + 46732/5247 * k3 + 49/176 * k4 - 5103/18656 * k5) * self.step_size
+        k6 = self.differentiator(inp_k6)
+        # Final
+        update = 35/384 * k1 + 500/1113 * k3 + 125/192 * k4 - 2187/6784 * k5 + 11/84 * k6
+        input_seq_current = input_seq_current + self.step_size * update
+        return input_seq_current, update
+
 
     def ode3_update(self, input_seq_current):
         '''

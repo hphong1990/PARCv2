@@ -21,7 +21,7 @@ def resnet_unit(feat_dim, kernel_size, x_in, padding="CONSTANT"):
     x = tf.pad(x_in, pad_instruct, padding)
     x = Conv2D(feat_dim, kernel_size, padding="valid")(x)
     x = ReLU()(x)
-    x = tf.pad(x, pad_instruct, padding)(x)
+    x = tf.pad(x, pad_instruct, padding)
     x = Conv2D(feat_dim, kernel_size, padding="valid")(x)
     x = ReLU()(x_in + x)
     return x
@@ -135,18 +135,18 @@ def spade_generator_unit(x, mask, feats_out, kernel, upsampling=True, padding="C
                                         |                               |
                                          ---- (SPADE + Relu + Conv) ----
     """
-    to_pad = (kernel_size - 1) // 2
+    to_pad = (kernel - 1) // 2
     pad_instruct = tf.constant([[0, 0], [to_pad, to_pad], [to_pad, to_pad], [0, 0]])
     x = GaussianNoise(0.05)(x)
     # Residual SPADE & conv
     spade1 = SPADE(feats_out)(x, mask)
     relu1 = LeakyReLU(0.2)(spade1)
     relu1 = tf.pad(relu1, pad_instruct, padding)
-    conv1 = Conv2D(feats_out,kernel, padding='valid')(relu1)
+    conv1 = Conv2D(feats_out, kernel, padding='valid')(relu1)
     spade2 = SPADE(feats_out, padding=padding)(conv1, mask)
     relu2 = LeakyReLU(0.2)(spade2)
     relu2 = tf.pad(relu2, pad_instruct, padding)
-    conv2 = Conv2D(feats_out,kernel, padding='valid')(relu2)
+    conv2 = Conv2D(feats_out, kernel, padding='valid')(relu2)
     # Skip
     spade_skip = SPADE(feats_out, padding=padding)(x, mask)
     relu_skip = LeakyReLU(0.2)(spade_skip)
