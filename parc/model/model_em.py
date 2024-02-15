@@ -15,19 +15,19 @@ Differentiator for EM problems:
 
 def differentiator_em(n_state_var=3):
     # Model initiation
-    feature_extraction = layer.feature_extraction_unet(input_shape = (128, 192), n_channel=n_state_var+2)
+    feature_extraction = layer.feature_extraction_unet(input_shape = (128, 256), n_channel=n_state_var+2)
     
     mapping_and_recon = []
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=2, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=1, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=1, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 256), n_mask_channel=2, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 256), n_mask_channel=1, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 256), n_mask_channel=1, output_channel=1))
     
     advection = [layer.Advection() for _ in range(n_state_var+2)]
     diffusion = layer.Diffusion()
-    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=2, output_channel=2)
+    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (128, 256), n_mask_channel=2, output_channel=2)
 
     # Main computation graph
-    input_tensor = Input(shape=(128 , 192, n_state_var+2), dtype = tf.float32)
+    input_tensor = Input(shape=(128, 256, n_state_var+2), dtype = tf.float32)
     init_state_var = input_tensor[:,:,:,:n_state_var]
     velocity_field = input_tensor[:,:,:,n_state_var:]
 
@@ -64,15 +64,15 @@ def differentiator_em(n_state_var=3):
 def integrator(n_state_var = 3):
     state_integrators = []
     for _ in range(n_state_var):
-        state_integrators.append(layer.integrator_cnn(input_shape = (128,192)))
+        state_integrators.append(layer.integrator_cnn(input_shape = (128,256)))
 
-    velocity_integrator = layer.integrator_cnn(input_shape = (128,192), n_output=2)
+    velocity_integrator = layer.integrator_cnn(input_shape = (128,256), n_output=2)
 
-    state_var_prev = keras.layers.Input(shape = (128, 192, n_state_var), dtype = tf.float32)
-    velocity_prev = keras.layers.Input(shape = (128, 192,2), dtype = tf.float32)
+    state_var_prev = keras.layers.Input(shape = (128, 256, n_state_var), dtype = tf.float32)
+    velocity_prev = keras.layers.Input(shape = (128, 256,2), dtype = tf.float32)
     
-    state_var_dot = keras.layers.Input(shape = (128, 192,n_state_var), dtype = tf.float32)
-    velocity_dot = keras.layers.Input(shape = (128, 192,2), dtype = tf.float32)
+    state_var_dot = keras.layers.Input(shape = (128, 256,n_state_var), dtype = tf.float32)
+    velocity_dot = keras.layers.Input(shape = (128, 256,2), dtype = tf.float32)
 
     state_var_next = []
         
@@ -166,6 +166,7 @@ class PARCv2(keras.Model):
                     
             total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_var_next,state_var_gt) + 
                             tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(velocity_next,velocity_gt))/2
+            
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
@@ -174,6 +175,31 @@ class PARCv2(keras.Model):
         return {
             "total_loss": self.total_loss_tracker.result(),
         }
+    
+    # Customized Loss Functions
+    def advec_diff_loss(self, y_pred, y_true): # gradient and divergence loss term
+        # Add this to total_loss line 167 -> self.advec_diff_loss(y_pred = state_var_next, y_true = state_var_gt)
+        
+        # Compute gradient for y_pred and y_true
+        dy_grad_pred, dx_grad_pred = tf.image.image_gradients(y_pred)
+        dy_grad_true, dx_grad_true = tf.image.image_gradients(y_true)
+        
+        # Laplacian loss
+        dy_pred, dx_pred = tf.image.image_gradients(y_pred)
+        dyy_pred, _ = tf.image.image_gradients(dy_pred)
+        _ , dxx_pred = tf.image.image_gradients(dx_pred)
+        laplacian_pred = tf.add(dyy_pred, dxx_pred)
+        
+        dy_true, dx_true = tf.image.image_gradients(y_true)
+        dyy_true, _ = tf.image.image_gradients(dy_true)
+        _ , dxx_true = tf.image.image_gradients(dx_true)
+        laplacian_true = tf.add(dyy_true, dxx_true)
+        
+        grad_loss_y = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(dy_grad_pred, dy_grad_true)
+        grad_loss_x = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(dx_grad_pred, dx_grad_true)
+        laplacian_loss = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(laplacian_pred, laplacian_true)
+        
+        return grad_loss_y + grad_loss_x + laplacian_loss
     
     # Update scheme
     def explicit_update(self, input_seq_current):
