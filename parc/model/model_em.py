@@ -103,19 +103,19 @@ class PARCv2(keras.Model):
         else:
             self.integrator.trainable = False
         
-        self.input_layer1 = keras.layers.Input((128, 256, 3))
-        self.input_layer2 = keras.layers.Input((128, 256, 2))
-        self.out = self.call([self.input_layer1, self.input_layer2])
+#         self.input_layer1 = keras.layers.Input((128, 256, 3))
+#         self.input_layer2 = keras.layers.Input((128, 256, 2))
+#         self.out = self.call([self.input_layer1, self.input_layer2])
         
-        super(PARCv2, self).__init__(
-            inputs=[self.input_layer1, self.input_layer2], outputs=self.out, **kwargs
-        )
+#         super(PARCv2, self).__init__(
+#             inputs=[self.input_layer1, self.input_layer2], outputs=self.out, **kwargs
+#         )
 
-    def build(self):
-        self._is_graph_network = True
-        self._init_graph_network(
-            inputs=[self.input_layer1, self.input_layer2], outputs=self.out
-        )
+#     def build(self):
+#         self._is_graph_network = True
+#         self._init_graph_network(
+#             inputs=[self.input_layer1, self.input_layer2], outputs=self.out
+#         )
 
     @property
     def metrics(self):
