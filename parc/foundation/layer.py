@@ -3,6 +3,70 @@ from tensorflow.keras import  layers, regularizers
 from keras.layers import *
 import tensorflow as tf
 
+class SPADE(layers.Layer):
+    """
+    Implementation of Spatially-Adaptive Normalization layer
+    
+    """
+    def __init__(self, filters, epsilon=1e-5, **kwargs):
+        super().__init__(**kwargs)
+        self.epsilon = epsilon
+        self.conv = layers.Conv2D(filters, 3, padding="same", activation="relu")
+        self.conv_gamma = layers.Conv2D(filters, 3, padding="same")
+        self.conv_beta = layers.Conv2D(filters, 3, padding="same")
+
+    def build(self, input_shape):
+        self.resize_shape = input_shape[1:3]
+
+    def call(self, input_tensor, raw_mask):
+        with tf.device('/GPU:0'):
+
+            mask = tf.image.resize(raw_mask, self.resize_shape, method="nearest")
+            x = self.conv(mask)    
+
+            gamma = self.conv_gamma(x)
+            beta = self.conv_beta(x)
+            mean, var = tf.nn.moments(input_tensor, axes=(0, 1, 2), keepdims=True)
+            std = tf.sqrt(var + self.epsilon)
+
+            normalized = (input_tensor - mean) / std
+            output = gamma * normalized + beta
+            
+        return output
+    
+class Advection(layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, state_variable, velocity_field):
+        dy, dx = tf.image.image_gradients(state_variable)
+        spatial_deriv = tf.concat([dy,dx],axis = -1)
+        advect = tf.reduce_sum(tf.multiply(spatial_deriv,velocity_field),axis = -1, keepdims=True)
+        return advect
+
+class Diffusion(layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, state_variable):
+        dy, dx = tf.image.image_gradients(state_variable)
+        dyy, _ = tf.image.image_gradients(dy)
+        _ , dxx = tf.image.image_gradients(dx)
+        laplacian = tf.add(dyy,dxx)
+        return laplacian
+    
+class Poisson(layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, vector_field):
+        uy, ux = tf.image.image_gradients(vector_field[0])
+        vy, vx = tf.image.image_gradients(vector_field[1])
+        ux2 = tf.multiply(ux,ux)
+        vy2 = tf.multiply(vy,vy)
+        uyvx = tf.multiply(uy,vx)
+        return ux2,vy2,uyvx
+
 def resnet_unit(feat_dim, kernel_size, x_in):
     """
     Resnet unit: x_in --> conv --> relu --> conv --> + relu --> x_out
@@ -102,37 +166,6 @@ def conv_block_up_wo_concat(x, feat_dim, reps, kernel_size, mode = 'normal'):
                       x)
     return x
 
-class SPADE(layers.Layer):
-    """
-    Implementation of Spatially-Adaptive Normalization layer
-    
-    """
-    def __init__(self, filters, epsilon=1e-5, **kwargs):
-        super().__init__(**kwargs)
-        self.epsilon = epsilon
-        self.conv = layers.Conv2D(filters, 3, padding="same", activation="relu")
-        self.conv_gamma = layers.Conv2D(filters, 3, padding="same")
-        self.conv_beta = layers.Conv2D(filters, 3, padding="same")
-
-    def build(self, input_shape):
-        self.resize_shape = input_shape[1:3]
-
-    def call(self, input_tensor, raw_mask):
-        with tf.device('/GPU:0'):
-
-            mask = tf.image.resize(raw_mask, self.resize_shape, method="nearest")
-            x = self.conv(mask)    
-
-            gamma = self.conv_gamma(x)
-            beta = self.conv_beta(x)
-            mean, var = tf.nn.moments(input_tensor, axes=(0, 1, 2), keepdims=True)
-            std = tf.sqrt(var + self.epsilon)
-
-            normalized = (input_tensor - mean) / std
-            output = gamma * normalized + beta
-            
-        return output
-
 def spade_generator_unit(x, mask, feats_out, kernel, upsampling = True):
     """
     SPADE block: x_in -> GaussianNoise ---> (SPADE + Relu + Conv) x 2 -----> upsampling (optional) --> output
@@ -142,15 +175,15 @@ def spade_generator_unit(x, mask, feats_out, kernel, upsampling = True):
     x = GaussianNoise(0.05)(x)
     
     # Residual SPADE & conv
-    spade1 = SPADE(feats_out)(x, mask)
+    spade1 = base.SPADE(feats_out)(x, mask)
     relu1 = LeakyReLU(0.2)(spade1)
     conv1 = Conv2D(feats_out,kernel, padding='same')(relu1)
-    spade2 = SPADE(feats_out)(conv1, mask)
+    spade2 = base.SPADE(feats_out)(conv1, mask)
     relu2 = LeakyReLU(0.2)(spade2)
     conv2 = Conv2D(feats_out,kernel, padding='same')(relu2)
     
     # Skip
-    spade_skip = SPADE(feats_out)(x, mask)
+    spade_skip = base.SPADE(feats_out)(x, mask)
     relu_skip = LeakyReLU(0.2)(spade_skip)
     conv_skip = Conv2D(feats_out,kernel, padding='same')(relu_skip)
 
@@ -253,41 +286,6 @@ def feature_extraction_burgers(input_shape = (128,192), n_out_features = 64, n_b
                                     mode = 'normal')
     unet = keras.Model(inputs, feature_out)
     return unet
-
-
-
-class Advection(layers.Layer):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def call(self, state_variable, velocity_field):
-        dy, dx = tf.image.image_gradients(state_variable)
-        spatial_deriv = tf.concat([dy,dx],axis = -1)
-        advect = tf.reduce_sum(tf.multiply(spatial_deriv,velocity_field),axis = -1, keepdims=True)
-        return advect
-
-class Diffusion(layers.Layer):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def call(self, state_variable):
-        dy, dx = tf.image.image_gradients(state_variable)
-        dyy, _ = tf.image.image_gradients(dy)
-        _ , dxx = tf.image.image_gradients(dx)
-        laplacian = tf.add(dyy,dxx)
-        return laplacian
-    
-class Poisson(layers.Layer):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def call(self, vector_field):
-        uy, ux = tf.image.image_gradients(vector_field[0])
-        vy, vx = tf.image.image_gradients(vector_field[1])
-        ux2 = tf.multiply(ux,ux)
-        vy2 = tf.multiply(vy,vy)
-        uyvx = tf.multiply(uy,vx)
-        return ux2,vy2,uyvx
 
 def mapping_and_recon_cnn(input_shape = (128,192), n_base_features = 128, n_mask_channel = 1, output_channel = 1 ):
     inputs = keras.Input(shape = (input_shape[0], input_shape[1], n_base_features), dtype = tf.float32)
