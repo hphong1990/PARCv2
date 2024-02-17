@@ -1,5 +1,5 @@
 from tensorflow import keras
-from tensorflow.keras import  layers, regularizers
+from tensorflow.keras import layers, regularizers
 from keras.layers import *
 import tensorflow as tf
 
