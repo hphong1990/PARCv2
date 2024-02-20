@@ -13,7 +13,7 @@ class EnergeticMatDataPipeLine:
         vel_seq_whole = []
 
         for i in range(idx_range[0],idx_range[1]):
-            file_path = os.path.join(os.sep,'project','SDS','research', 'Nguyen_storage', 'data', 'single_void_data', f'void_{i}.npy')
+            file_path = os.path.join(os.sep,'scratch','xc7ts','fno', 'em', 'single_void_data', f'void_{i}.npy')
             if os.path.exists(file_path):
                 print(f'void_{i}')
                 raw_data = np.float32(np.load(file_path))

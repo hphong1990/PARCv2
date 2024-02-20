@@ -2,7 +2,7 @@ from tensorflow import keras
 from tensorflow.keras import  layers, regularizers
 from keras.layers import *
 import tensorflow as tf
-from parc import layer
+from PARCv2.parc import layer
 
 from tensorflow.keras.layers import Concatenate, Input
 from tensorflow.keras.models import Model
@@ -12,27 +12,32 @@ Differentiator for hypersonic flow problem:
     - state vars: density, pressure
     - there is no constant field using
 """
-DATA_SHAPE = (500, 750)
+DATA_SHAPE = (112, 176)
 
 def differentiator_em(n_state_var=2):
     # Model initiation
-    feature_extraction = layer.feature_extraction_unet(input_shape=DATA_SHAPE, n_channel=n_state_var+2)
+    feature_extraction = layer.feature_extraction_unet(input_shape=DATA_SHAPE,
+                                                       n_channel=n_state_var+2)
     
     mapping_and_recon = []
     # rho_dot: n_mask_channel=2 because of advec+diff
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE, n_mask_channel=2, 
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE,
+                                                         n_mask_channel=2, 
                                                          output_channel=1))
-      # p_dot: n_mask_channel=1 because of no diffusion
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE, n_mask_channel=1,
+    # p_dot: n_mask_channel=1 because of no diffusion
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE,
+                                                         n_mask_channel=1,
                                                          output_channel=1))
     
     advection = [layer.Advection() for _ in range(n_state_var+2)]
     diffusion = layer.Diffusion()
-    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE, n_mask_channel=2,
+    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape=DATA_SHAPE,
+                                                             n_mask_channel=2,
                                                              output_channel=2)
 
     # Main computation graph
-    input_tensor = Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], n_state_var+2), dtype = tf.float32)
+    input_tensor = Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], n_state_var+2), 
+                         dtype = tf.float32)
     init_state_var = input_tensor[:,:,:,:n_state_var]
     velocity_field = input_tensor[:,:,:,n_state_var:]
 
@@ -72,7 +77,8 @@ def integrator(n_state_var=2):
 
     state_var_prev = keras.layers.Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], n_state_var), 
                                         dtype=tf.float32)
-    velocity_prev = keras.layers.Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], 2), dtype=tf.float32)
+    velocity_prev = keras.layers.Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], 2),
+                                       dtype=tf.float32)
     
     state_var_dot = keras.layers.Input(shape=(DATA_SHAPE[0], DATA_SHAPE[1], n_state_var), 
                                        dtype=tf.float32)
@@ -92,8 +98,9 @@ def integrator(n_state_var=2):
 
 @keras.saving.register_keras_serializable()
 class PARCv2(keras.Model):
-    def __init__(self, n_state_var, n_time_step, step_size, solver="rk4", mode="integrator_training",
-                 use_data_driven_int=True, differentiator_backbone="em", **kwargs):
+    def __init__(self, n_state_var, n_time_step, step_size, solver="rk4",
+                 mode="integrator_training", use_data_driven_int=True,
+                 differentiator_backbone="em", **kwargs):
         super(PARCv2, self).__init__(**kwargs)
         self.n_state_var = n_state_var
         self.n_time_step = n_time_step
@@ -110,7 +117,7 @@ class PARCv2(keras.Model):
         else:
             self.integrator.trainable = False
         
-        self.input_layer1 = keras.layers.Input((DATA_SHAPE[0], DATA_SHAPE[1], 3))
+        self.input_layer1 = keras.layers.Input((DATA_SHAPE[0], DATA_SHAPE[1], 2))
         self.input_layer2 = keras.layers.Input((DATA_SHAPE[0], DATA_SHAPE[1], 2))
         self.out = self.call([self.input_layer1, self.input_layer2])
         
@@ -130,7 +137,7 @@ class PARCv2(keras.Model):
         self.total_loss_tracker,
         ]
     
-    def call(self, input):
+    def call(self, input, training=False):
         state_var_init = tf.cast(input[0],dtype = tf.float32)
         velocity_init = tf.cast(input[1], dtype = tf.float32)
         input_seq = Concatenate(axis = -1)([state_var_init, velocity_init])
@@ -141,7 +148,10 @@ class PARCv2(keras.Model):
         for _ in range(self.n_time_step):    
             input_seq_current, update = self.explicit_update(input_seq_current)
             if self.use_data_driven_int == True:
-                state_var_next, velocity_next = self.integrator([update[:,:,:,:3],update[:,:,:,3:],input_seq_current[:,:,:,:3], input_seq_current[:,:,:,3:]])
+                state_var_next, velocity_next = self.integrator([update[:,:,:,:2],
+                                                                 update[:,:,:,2:],
+                                                                 input_seq_current[:,:,:,:2],
+                                                                 input_seq_current[:,:,:,2:]])
                 input_seq_current = Concatenate()([state_var_next, velocity_next])
                         
             res.append(input_seq_current)
@@ -158,18 +168,16 @@ class PARCv2(keras.Model):
 
         input_seq_current = input_seq
         with tf.GradientTape() as tape:
-            if self.mode == "integrator_training":
-                for ts in range(self.n_time_step):
-                    # Compute k1
-                    input_seq_current, update = self.explicit_update(input_seq_current)
-                    state_var_next, velocity_next = self.integrator([update[:,:,:,:3],update[:,:,:,3:],input_seq_current[:,:,:,:3], input_seq_current[:,:,:,3:]])
-                    input_seq_current = Concatenate()([state_var_next, velocity_next])
-                
-            else: 
+            for ts in range(self.n_time_step):
+                # Compute k1
                 input_seq_current, update = self.explicit_update(input_seq_current)
+                if self.mode == "integrator_training":
+                    state_var_next, velocity_next = self.integrator([update[:,:,:,:2],
+                                                                     update[:,:,:,2:], input_seq_current[:,:,:,:2], input_seq_current[:,:,:,2:]])
+                    input_seq_current = Concatenate()([state_var_next, velocity_next])
 
-            state_var_next = input_seq_current[:,:,:,:3]
-            velocity_next = input_seq_current[:,:,:,3:]
+            state_var_next = input_seq_current[:,:,:,:2]
+            velocity_next = input_seq_current[:,:,:,2:]
                     
             total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_var_next,state_var_gt) + 
                             tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(velocity_next,velocity_gt))/2
@@ -180,6 +188,35 @@ class PARCv2(keras.Model):
 
         return {
             "total_loss": self.total_loss_tracker.result(),
+        }
+
+    @tf.function
+    def test_step(self, data):
+        state_var_init = tf.cast(data[0][0],dtype = tf.float32)
+        velocity_init = tf.cast(data[0][1], dtype = tf.float32)
+        input_seq = Concatenate(axis = -1)([state_var_init, velocity_init])
+
+        state_var_gt = tf.cast(data[1][0], dtype = tf.float32)
+        velocity_gt = tf.cast(data[1][1], dtype = tf.float32)
+
+        input_seq_current = input_seq
+        for ts in range(self.n_time_step):
+            input_seq_current, update = self.explicit_update(input_seq_current)
+            if self.mode == "integrator_training":
+                state_var_next, velocity_next = self.integrator([update[:,:,:,:2], update[:,:,:,2:], 
+                                                                 input_seq_current[:,:,:,:2], input_seq_current[:,:,:,2:]])
+                input_seq_current = Concatenate()([state_var_next, velocity_next])
+                
+        state_var_next = input_seq_current[:,:,:,:2]
+        velocity_next = input_seq_current[:,:,:,2:]
+                    
+        total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_var_next,state_var_gt) + 
+                       tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(velocity_next,velocity_gt))/2
+
+        self.total_loss_tracker.update_state(total_loss)
+
+        return {
+            "val_loss": self.total_loss_tracker.result(),
         }
     
     # Update scheme
