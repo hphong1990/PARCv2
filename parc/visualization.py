@@ -16,8 +16,6 @@ def scale_temperature(temperatures, start_ts, max_temp, min_temp):
     :return temperatures_scaled:(numpy) scaled temperature fields
     """
     temperatures = temperatures[:, :, :, start_ts:]
-
-#     temperatures_scaled = (temperatures + 1.0) / 2.0
     temperatures_scaled = (temperatures * (max_temp - min_temp)) + min_temp
     return temperatures_scaled
 
