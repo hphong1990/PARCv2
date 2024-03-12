@@ -2,6 +2,7 @@ from tensorflow import keras
 from tensorflow.keras import layers, regularizers
 from keras.layers import *
 import tensorflow as tf
+import numpy as np
 
 def resnet_unit(feat_dim, kernel_size, x_in, padding="CONSTANT"):
     """
@@ -266,41 +267,86 @@ def feature_extraction_burgers(input_shape = (128,192), n_out_features = 64, n_b
     unet = keras.Model(inputs, feature_out)
     return unet
 
+
+class CentralDifference(object):
+    def __init__(self, channel_size, filter_1d, padding):
+        filter_size = filter_1d.shape[0]
+        pad_size = (filter_size - 1) // 2
+        if filter_size % 2:
+            self.pad_instruct = tf.constant([[0, 0], [pad_size, pad_size], 
+                                             [pad_size, pad_size], [0, 0]])
+        else:
+            self.pad_instruct = tf.constant([[0, 0], [pad_size, pad_size+1], 
+                                             [pad_size, pad_size+1], [0, 0]])
+        self.padding = padding
+        # Construct dy filter
+        self.dy_filter_qk = np.zeros((filter_size, filter_size, 
+                                      channel_size, channel_size), dtype=np.float32)
+        for i in range(channel_size):
+            self.dy_filter_qk[:, pad_size, i, i] = filter_1d
+        self.dy_filter_qk = tf.constant(self.dy_filter_qk)
+        # Construct dx filter        
+        self.dx_filter_qk = np.zeros((filter_size, filter_size, 
+                                      channel_size, channel_size), dtype=np.float32)
+        for i in range(channel_size):
+            self.dx_filter_qk[pad_size, :, i, i] = filter_1d
+        self.dx_filter_qk = tf.constant(self.dx_filter_qk)
+
+
+    def __call__(self, array_2d):
+        # Central differencing
+        array_2d_padded = tf.pad(array_2d, self.pad_instruct, self.padding)
+        dy = tf.nn.conv2d(array_2d_padded, self.dy_filter_qk, [1, 1, 1, 1], "VALID")
+        dx = tf.nn.conv2d(array_2d_padded, self.dx_filter_qk, [1, 1, 1, 1], "VALID")
+        return dy, dx
+
+
 class Advection(layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, channel_size, cd_filter_1d=np.array([-1.0, 1.0]), 
+                 padding="SYMMETRIC", **kwargs):
         super().__init__(**kwargs)
+        self.cdiff = CentralDifference(channel_size, cd_filter_1d, padding)
 
     def call(self, state_variable, velocity_field):
-        dy, dx = tf.image.image_gradients(state_variable)
+        # dy, dx = tf.image.image_gradients(state_variable)
+        dy, dx = self.cdiff(state_variable)
         spatial_deriv = tf.concat([dy,dx],axis = -1)
-        advect = tf.reduce_sum(tf.multiply(spatial_deriv,velocity_field),axis = -1, keepdims=True)
+        advect = tf.reduce_sum(tf.multiply(spatial_deriv, velocity_field),
+                               axis=-1, keepdims=True)
         return advect
 
 class Diffusion(layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, channel_size, cd_filter_1d=tf.constant([-1.0, 1.0]), padding="SYMMETRIC", **kwargs):
         super().__init__(**kwargs)
+        self.cdiff = CentralDifference(channel_size, cd_filter_1d, padding)
 
     def call(self, state_variable):
-        dy, dx = tf.image.image_gradients(state_variable)
-        dyy, _ = tf.image.image_gradients(dy)
-        _ , dxx = tf.image.image_gradients(dx)
+        # dy, dx = tf.image.image_gradients(state_variable)
+        # dyy, _ = tf.image.image_gradients(dy)
+        # _ , dxx = tf.image.image_gradients(dx)
+        dy, dx = self.cdiff(state_variable)
+        dyy, _ = self.cdiff(dy)
+        _, dxx = self.cdiff(dx)
         laplacian = tf.add(dyy,dxx)
         return laplacian
     
 class Poisson(layers.Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, channel_size, cd_filter_1d=tf.constant([-1.0, 1.0]), padding="SYMMETRIC", **kwargs):
         super().__init__(**kwargs)
+        self.cdiff = CentralDifference(channel_size, cd_filter_1d, padding)
 
     def call(self, vector_field):
-        uy, ux = tf.image.image_gradients(vector_field[0])
-        vy, vx = tf.image.image_gradients(vector_field[1])
-        ux2 = tf.multiply(ux,ux)
-        vy2 = tf.multiply(vy,vy)
-        uyvx = tf.multiply(uy,vx)
-        return ux2,vy2,uyvx
+        # uy, ux = tf.image.image_gradients(vector_field[0])
+        # vy, vx = tf.image.image_gradients(vector_field[1])
+        uy, ux = self.cdiff(vector_field[0])
+        vy, vx = self.cdiff(vector_field[1])
+        ux2 = tf.multiply(ux, ux)
+        vy2 = tf.multiply(vy, vy)
+        uyvx = tf.multiply(uy, vx)
+        return ux2, vy2, uyvx
 
-def mapping_and_recon_cnn(input_shape = (128,192), n_base_features = 128, n_mask_channel = 1, output_channel = 1,
-                          padding="CONSTANT"):
+def mapping_and_recon_cnn(input_shape=(128,192), n_base_features=128, n_mask_channel=1, 
+                          output_channel=1, padding="CONSTANT"):
     inputs = keras.Input(shape = (input_shape[0], input_shape[1], n_base_features), dtype = tf.float32)
     inputs_2 = keras.Input(shape = (input_shape[0], input_shape[1], n_mask_channel), dtype = tf.float32)
     
