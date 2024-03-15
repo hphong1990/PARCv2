@@ -7,57 +7,6 @@ from parc import layer
 from tensorflow.keras.layers import Concatenate, Input
 from tensorflow.keras.models import Model
 
-"""
-Model definition customized for Burgers' problems: 
-    - In this problem, state vars and velocity only include velocity
-    - Architecture was adjusted to make it lighter and comparable with PhyCRNet
-"""
-
-def differentiator_burgers():
-    # Model initiation
-    feature_extraction = layer.feature_extraction_burgers(input_shape = (64,64), n_channel = 3)
-    
-    advection = [layer.Advection() for _ in range(2)]
-    diffusion = [layer.Diffusion() for _ in range(2)]
-    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (64,64), n_base_features = 64, n_mask_channel=4, output_channel=2)
-
-    # Main computation graph
-    # Input layer
-    velocity_field = Input(shape=(64,64, 3), dtype = tf.float32)
-
-    # Reaction term
-    dynamic_feature = feature_extraction(velocity_field)
-
-    # u
-    advec_u = advection[0](velocity_field[:, :, :, 0:1], velocity_field[:, :, :, 0:2])
-    diffusion_u = diffusion[0](velocity_field[:, :, :, 0:1])
-    
-    # v
-    advec_v = advection[1](velocity_field[:, :, :, 1:2], velocity_field[:, :, :, 0:2])
-    diffusion_v = diffusion[1](velocity_field[:, :, :, 1:2])    
-    
-    # Concatenate
-    advec_diff_concat = Concatenate(axis=-1)([advec_u,advec_v,diffusion_u,diffusion_v])
-    
-    # Final mapping
-    velocity_dot = velocity_mapping_and_recon([dynamic_feature, advec_diff_concat])
-    
-    differentiator = Model(velocity_field, velocity_dot, name = 'differentiator')
-    return differentiator
-
-def integrator_burgers():
-    # Model initiation
-    velocity_integrator = layer.integrator_cnn(input_shape = (64,64), n_base_features = 64, n_output=2)
-
-    # Input layer
-    velocity_prev = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
-    velocity_dot = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
-
-    # Data driven integrator
-    velocity_next = velocity_integrator([velocity_dot, velocity_prev])
-    integrator = keras.Model([velocity_dot, velocity_prev], [velocity_next], name = 'integrator')
-    return integrator
-
 # @keras.saving.register_keras_serializable()
 class PARCv2_burgers(keras.Model):
     def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, **kwargs):
@@ -67,28 +16,65 @@ class PARCv2_burgers(keras.Model):
         self.solver = solver
         self.mode = mode
         self.use_data_driven_int = use_data_driven_int
-        self.differentiator = differentiator_burgers()
-        self.integrator = integrator_burgers()
+        self.differentiator = self.differentiator_burgers()
+        self.integrator = self.integrator_burgers()
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         if self.mode == "integrator_training":
             self.differentiator.trainable = False
         else:
             self.integrator.trainable = False
 
-        self.input_layer = keras.layers.Input((64, 64, 3))
-        self.out = self.call(self.input_layer)
+    """
+    Model definition customized for Burgers' problems: 
+        - In this problem, state vars and velocity only include velocity
+        - Architecture was adjusted to make it lighter and comparable with PhyCRNet
+    """
+
+    def differentiator_burgers(self):
+        # Model initiation
+        feature_extraction = layer.feature_extraction_burgers(input_shape = (64,64), n_channel = 3)
         
-        super(PARCv2_burgers, self).__init__(
-            inputs=self.input_layer, outputs=self.out, **kwargs
-        )
+        advection = [layer.Advection() for _ in range(2)]
+        diffusion = [layer.Diffusion() for _ in range(2)]
+        velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (64,64), n_base_features = 64, n_mask_channel=4, output_channel=2)
+
+        # Main computation graph
+        # Input layer
+        velocity_field = Input(shape=(64,64, 3), dtype = tf.float32)
+
+        # Reaction term
+        dynamic_feature = feature_extraction(velocity_field)
+
+        # u
+        advec_u = advection[0](velocity_field[:, :, :, 0:1], velocity_field[:, :, :, 0:2])
+        diffusion_u = diffusion[0](velocity_field[:, :, :, 0:1])
+        
+        # v
+        advec_v = advection[1](velocity_field[:, :, :, 1:2], velocity_field[:, :, :, 0:2])
+        diffusion_v = diffusion[1](velocity_field[:, :, :, 1:2])    
+        
+        # Concatenate
+        advec_diff_concat = Concatenate(axis=-1)([advec_u,advec_v,diffusion_u,diffusion_v])
+        
+        # Final mapping
+        velocity_dot = velocity_mapping_and_recon([dynamic_feature, advec_diff_concat])
+        
+        differentiator = Model(velocity_field, velocity_dot, name = 'differentiator')
+        return differentiator
+
+    def integrator_burgers(self):
+        # Model initiation
+        velocity_integrator = layer.integrator_cnn(input_shape = (64,64), n_base_features = 64, n_output=2)
+
+        # Input layer
+        velocity_prev = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
+        velocity_dot = keras.layers.Input(shape = (64,64, 2), dtype = tf.float32)
+
+        # Data driven integrator
+        velocity_next = velocity_integrator([velocity_dot, velocity_prev])
+        integrator = keras.Model([velocity_dot, velocity_prev], [velocity_next], name = 'integrator')
+        return integrator
     
-    def build(self):
-        self._is_graph_network = True
-        self._init_graph_network(
-            inputs=[self.input_layer], outputs=self.out
-        )
-
-
     @property
     def metrics(self):
         return [
