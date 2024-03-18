@@ -302,7 +302,7 @@ class CentralDifference(object):
 
 
 class Advection(layers.Layer):
-    def __init__(self, channel_size, cd_filter_1d=np.array([-1.0, 1.0]), 
+    def __init__(self, channel_size=1, cd_filter_1d=np.array([-1.0, 1.0]), 
                  padding="SYMMETRIC", **kwargs):
         super().__init__(**kwargs)
         self.cdiff = CentralDifference(channel_size, cd_filter_1d, padding)
@@ -316,7 +316,7 @@ class Advection(layers.Layer):
         return advect
 
 class Diffusion(layers.Layer):
-    def __init__(self, channel_size, cd_filter_1d=tf.constant([-1.0, 1.0]), padding="SYMMETRIC", **kwargs):
+    def __init__(self, channel_size=1, cd_filter_1d=tf.constant([-1.0, 1.0]), padding="SYMMETRIC", **kwargs):
         super().__init__(**kwargs)
         self.cdiff = CentralDifference(channel_size, cd_filter_1d, padding)
 
@@ -331,7 +331,7 @@ class Diffusion(layers.Layer):
         return laplacian
     
 class Poisson(layers.Layer):
-    def __init__(self, channel_size, cd_filter_1d=tf.constant([-1.0, 1.0]), padding="SYMMETRIC", **kwargs):
+    def __init__(self, channel_size=1, cd_filter_1d=tf.constant([-1.0, 1.0]), padding="SYMMETRIC", **kwargs):
         super().__init__(**kwargs)
         self.cdiff = CentralDifference(channel_size, cd_filter_1d, padding)
 
