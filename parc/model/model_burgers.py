@@ -6,9 +6,10 @@ from parc import layer
 
 from tensorflow.keras.layers import Concatenate, Input
 from tensorflow.keras.models import Model
+from parc.model.base_model import PARCv2
 
 # @keras.saving.register_keras_serializable()
-class PARCv2_burgers(keras.Model):
+class PARCv2_burgers(PARCv2):
     def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, **kwargs):
         super(PARCv2_burgers, self).__init__(**kwargs)
         self.n_time_step = n_time_step
@@ -16,8 +17,8 @@ class PARCv2_burgers(keras.Model):
         self.solver = solver
         self.mode = mode
         self.use_data_driven_int = use_data_driven_int
-        self.differentiator = self.differentiator_burgers()
-        self.integrator = self.integrator_burgers()
+        self.differentiator = self.build_differentiator()
+        self.integrator = self.build_integrator()
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         if self.mode == "integrator_training":
             self.differentiator.trainable = False
@@ -30,7 +31,7 @@ class PARCv2_burgers(keras.Model):
         - Architecture was adjusted to make it lighter and comparable with PhyCRNet
     """
 
-    def differentiator_burgers(self):
+    def build_differentiator(self):
         # Model initiation
         feature_extraction = layer.feature_extraction_burgers(input_shape = (64,64), n_channel = 3)
         
@@ -62,7 +63,7 @@ class PARCv2_burgers(keras.Model):
         differentiator = Model(velocity_field, velocity_dot, name = 'differentiator')
         return differentiator
 
-    def integrator_burgers(self):
+    def build_integrator(self):
         # Model initiation
         velocity_integrator = layer.integrator_cnn(input_shape = (64,64), n_base_features = 64, n_output=2)
 
