@@ -10,17 +10,9 @@ from abc import abstractmethod
 
 # @keras.saving.register_keras_serializable()
 class PARCv2(keras.Model):
-    def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, **kwargs):
+    def __init__(self, **kwargs):
         super(PARCv2, self).__init__(**kwargs)
-        
-    @abstractmethod
-    def build_differentiator(self):
-        pass
 
-    @abstractmethod
-    def build_integrator(self):
-        pass
-    
     @property
     def metrics(self):
         return [

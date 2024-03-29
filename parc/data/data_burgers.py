@@ -1,5 +1,5 @@
 import os
-from parc.data.data_base import BaseData
+from parc.data.base_data import BaseData
 import numpy as np
 import skimage
 from skimage.measure import block_reduce
@@ -7,17 +7,27 @@ from skimage.measure import block_reduce
 class DataBurgers(BaseData):
     def __init__(self, **kwargs):
         super(DataBurgers, self).__init__(**kwargs)
-
-    def clip_raw_data(folder_path, R_list, a_list, w_list, sequence_length=2, purpose = 'training'):
         # Download data
 
-        
+    def information(self):
+        print("Train ")
+        pass
+
+    def clip_raw_data(self, R_list, a_list, w_list, sequence_length=2, purpose = 'training'):
         vel_seq_whole = []
+        if purpose == 'training':
+            base_name = 'burgers_train_'
+            base_multiplier = 10
+            folder_path = './data/burgers/train/'
+        else:
+            base_name = 'burgers_test_'
+            base_multiplier = 100
+            folder_path = './data/burgers/test/'
         # Looping through the file list
         for R in R_list:
             for a in a_list:
                 for w in w_list:
-                    data_file_name = 'burgers_train_' + str(int(R)) + '_' + str(int(a*10)) + '_' + str(int(w*10)) + '.npy'
+                    data_file_name = base_name + str(int(R)) + '_' + str(int(a*base_multiplier)) + '_' + str(int(w*base_multiplier)) + '.npy'
                     file_path = folder_path + data_file_name                
                     if os.path.exists(file_path):
                         # Load data

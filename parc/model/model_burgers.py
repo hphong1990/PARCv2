@@ -10,7 +10,7 @@ from parc.model.base_model import PARCv2
 
 # @keras.saving.register_keras_serializable()
 class PARCv2_burgers(PARCv2):
-    def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, **kwargs):
+    def __init__(self, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, *args, **kwargs):
         super(PARCv2_burgers, self).__init__(**kwargs)
         self.n_time_step = n_time_step
         self.step_size = step_size
@@ -92,12 +92,12 @@ class PARCv2_burgers(PARCv2):
             for _ in range(self.n_time_step):    
                 velocity_next, update = self.explicit_update(input_seq_current)
                 velocity_next_hyper = self.integrator([update, velocity_next[:,:,:,:2]])
-                input_seq_current = Concatenate(axis = -1)([velocity_next_hyper, velocity_next[:,:,:,2:]])
-                res.append(input_seq_current)
+                input_seq_current = Concatenate(axis = -1)([velocity_next_hyper, input_seq_current[:,:,:,2:]])
+                res.append(velocity_next_hyper)
         else:
             for _ in range(self.n_time_step):  
                 velocity_next, update = self.explicit_update(input_seq_current)
-                input_seq_current = velocity_next
+                input_seq_current = velocity_next[:,:,:,:2]
                 res.append(input_seq_current)
         output = tf.concat(res,axis = -1)
         return output
@@ -125,7 +125,7 @@ class PARCv2_burgers(PARCv2):
                     output_snap.append(input_seq_current[:,:,:,:2])
 
             velocity_pred = Concatenate(axis = -1)(output_snap)
-            total_loss  = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(velocity_pred[:,:,:,:],velocity_gt[:,:,:,:])
+            total_loss  = tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(velocity_pred,velocity_gt)
                            
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -136,69 +136,69 @@ class PARCv2_burgers(PARCv2):
             "total_loss": self.total_loss_tracker.result(),
         }
     
-    # Update scheme
-    def explicit_update(self, input_seq_current):
-        input_seq_current = tf.clip_by_value(input_seq_current, 0, 1)
+    # # Update scheme
+    # def explicit_update(self, input_seq_current):
+    #     input_seq_current = tf.clip_by_value(input_seq_current, 0, 1)
 
-        if self.solver == "rk4":
-            input_seq_current, update = self.rk4_update(input_seq_current)
-        elif self.solver == 'heun':
-            input_seq_current, update = self.heun_update(input_seq_current)
-        else:
-            input_seq_current, update = self.euler_update(input_seq_current)
+    #     if self.solver == "rk4":
+    #         input_seq_current, update = self.rk4_update(input_seq_current)
+    #     elif self.solver == 'heun':
+    #         input_seq_current, update = self.heun_update(input_seq_current)
+    #     else:
+    #         input_seq_current, update = self.euler_update(input_seq_current)
 
-        return input_seq_current, update
+    #     return input_seq_current, update
 
-    def rk4_update(self, input_seq_current):
+    # def rk4_update(self, input_seq_current):
 
-        # Compute k1
-        k1 = self.differentiator(input_seq_current)
+    #     # Compute k1
+    #     k1 = self.differentiator(input_seq_current)
 
-        # Compute k2
-        inp_k2 = input_seq_current[:,:,:,:2] + self.step_size*1/2*k1 
-        inp_k2 = Concatenate(axis = -1)([inp_k2,input_seq_current[:,:,:,2:]])
+    #     # Compute k2
+    #     inp_k2 = input_seq_current[:,:,:,:2] + self.step_size*1/2*k1 
+    #     inp_k2 = Concatenate(axis = -1)([inp_k2,input_seq_current[:,:,:,2:]])
 
-        k2 = self.differentiator(inp_k2)
+    #     k2 = self.differentiator(inp_k2)
 
-        # Compute k3
-        inp_k3 = input_seq_current[:,:,:,:2] + self.step_size*1/2*k2
-        inp_k3 = Concatenate(axis = -1)([inp_k3,input_seq_current[:,:,:,2:]])
-        k3 = self.differentiator(inp_k3)
+    #     # Compute k3
+    #     inp_k3 = input_seq_current[:,:,:,:2] + self.step_size*1/2*k2
+    #     inp_k3 = Concatenate(axis = -1)([inp_k3,input_seq_current[:,:,:,2:]])
+    #     k3 = self.differentiator(inp_k3)
 
-        # Compute k4
-        inp_k4 = input_seq_current[:,:,:,:2] + self.step_size*k3
-        inp_k4 = Concatenate(axis = -1)([inp_k4,input_seq_current[:,:,:,2:]])
+    #     # Compute k4
+    #     inp_k4 = input_seq_current[:,:,:,:2] + self.step_size*k3
+    #     inp_k4 = Concatenate(axis = -1)([inp_k4,input_seq_current[:,:,:,2:]])
 
-        k4 = self.differentiator(inp_k4)
+    #     k4 = self.differentiator(inp_k4)
 
-        # Final
-        update = 1/6*(k1 + 2*k2 + 2*k3 + k4)
-        final_state = input_seq_current[:,:,:,:2] + self.step_size*update 
-        input_seq_current = Concatenate(axis = -1)([final_state,input_seq_current[:,:,:,2:]])
-        return input_seq_current, update
+    #     # Final
+    #     update = 1/6*(k1 + 2*k2 + 2*k3 + k4)
+    #     final_state = input_seq_current[:,:,:,:2] + self.step_size*update 
+    #     input_seq_current = Concatenate(axis = -1)([final_state,input_seq_current[:,:,:,2:]])
+    #     return input_seq_current, update
     
-    # Euler update function
-    def heun_update(self, input_seq_current):
-        # Compute update
-        k1 = self.differentiator(input_seq_current)
+    # # Euler update function
+    # def heun_update(self, input_seq_current):
+    #     # Compute update
+    #     k1 = self.differentiator(input_seq_current)
 
-        # Compute k2
-        inp_k2 = input_seq_current[:,:,:,:2] + self.step_size*k1 
-        inp_k2 = Concatenate(axis = -1)([inp_k2,input_seq_current[:,:,:,2:]])
+    #     # Compute k2
+    #     inp_k2 = input_seq_current[:,:,:,:2] + self.step_size*k1 
+    #     inp_k2 = Concatenate(axis = -1)([inp_k2,input_seq_current[:,:,:,2:]])
 
-        k2 = self.differentiator(inp_k2)
+    #     k2 = self.differentiator(inp_k2)
         
-        update = 1/2*(k1 + k2)
+    #     update = 1/2*(k1 + k2)
 
-        final_states = input_seq_current[:,:,:,:2] + self.step_size*update 
-        input_seq_current = Concatenate(axis = -1)([final_states,input_seq_current[:,:,:,2:]])
+    #     final_states = input_seq_current[:,:,:,:2] + self.step_size*update 
+    #     input_seq_current = Concatenate(axis = -1)([final_states,input_seq_current[:,:,:,2:]])
 
-        return input_seq_current, update
+    #     return input_seq_current, update
     
-    # Euler update function
-    def euler_update(self, input_seq_current):
-        # Compute update
-        update = self.differentiator(input_seq_current)
-        input_seq_current = input_seq_current + self.step_size*update 
+    # # Euler update function
+    # def euler_update(self, input_seq_current):
+    #     # Compute update
+    #     update = self.differentiator(input_seq_current)
+    #     input_seq_current = input_seq_current + self.step_size*update 
 
-        return input_seq_current, update
+    #     return input_seq_current, update
