@@ -10,9 +10,9 @@ import torch
 #                                                                   #
 # ================================================================= #
 
-class burgers_pde_loss:
+class BurgersPdeLoss:
     def __init__(self, dt=1.0, dx=1.0, **kwargs):
-        super(burgers_pde_loss, self).__init__(**kwargs)
+        super(BurgersPdeLoss, self).__init__(**kwargs)
         self.dt = dt
         self.dx = dx
     
@@ -69,9 +69,9 @@ class burgers_pde_loss:
 #                                                                   #
 # ================================================================= #
 
-class ns_pde_loss:
+class NSPdeLoss:
     def __init__(self, dt=1.0, dx=1.0, **kwargs):
-        super(ns_pde_loss, self).__init__(**kwargs)
+        super(NSPdeLoss, self).__init__(**kwargs)
         self.dt = dt
         self.dx = dx
     
@@ -134,11 +134,11 @@ class ns_pde_loss:
 #                   Metrics for EM problems                         #               
 #                                                                   #
 # ================================================================= #
-class em_loss:
+class EmLoss:
     def __init__(self, **kwargs):
-        super(em_loss, self).__init__(**kwargs)
+        super(EmLoss, self).__init__(**kwargs)
 
-    def compute_KLD(y_true, y_pred):
+    def compute_KLD(self, y_true, y_pred):
         """compute KL-divergence
         :param y_true: (numpy)
         :param y_pred: (numpy)
@@ -158,7 +158,7 @@ class em_loss:
         b = num / den
         return a + b - 0.5
 
-    def compute_quantitative_evaluation_sensitivity(y_trues, y_preds):
+    def compute_quantitative_evaluation_sensitivity(self, y_trues, y_preds):
         """Calculate average rmse, kld, and pearson correlation value
             across all time step of given sensitivity value derive from
             DNS (y_trues) w.r.t corresponding PARC predicted value (y_preds)
@@ -178,7 +178,7 @@ class em_loss:
         for i in range(ts):
             pcc = st.pearsonr(y_trues[:, i], y_preds[:, i])
             temp_rmse = sqrt(mean_squared_error(y_trues[:, i], y_preds[:, i]))
-            kld = compute_KLD(y_trues[:, i], y_preds[:, i])
+            kld = self.compute_KLD(y_trues[:, i], y_preds[:, i])
             pcc_list.append(pcc[0])
             rmse_list.append(temp_rmse)
             kld_list.append(kld)
@@ -186,7 +186,7 @@ class em_loss:
         return np.mean(rmse_list), np.mean(kld_list), np.mean(pcc_list)
 
 
-    def _calculate_hotspot_metric(Ts, n_timesteps=16):
+    def _calculate_hotspot_metric(self, Ts, n_timesteps=16):
         """calculates the hotspot temperature and area for single case
         :param test_data:   (numpy) temperature for single case with timesteps; [width, height, timesteps]
         :param n_timesteps: (int)   number of timesteps to calculate the sensitivity
@@ -215,7 +215,7 @@ class em_loss:
         return hotspot_areas, hotspot_temperatures
 
 
-    def calculate_hotspot_metric(T_cases, cases_range, n_timesteps):
+    def calculate_hotspot_metric(self, T_cases, cases_range, n_timesteps):
         """calculates hotspot temperature and area for given cases
         :param T_cases:     (numpy) temperature fieds for different cases
         :param cases_range: (tuple) range of cases to test
@@ -234,7 +234,7 @@ class em_loss:
         # calculate average hotspot area and temperature across cases
         hotspot_areas, hotspot_temperatures = [], []
         for i in range(cases_range[0], cases_range[1]):
-            hotspot_areas_i, hotspot_temperatures_i = _calculate_hotspot_metric(
+            hotspot_areas_i, hotspot_temperatures_i = self._calculate_hotspot_metric(
                 T_cases[i, :, :, :], n_timesteps
             )
             hotspot_areas.append(hotspot_areas_i)
@@ -261,7 +261,7 @@ class em_loss:
         return hs_temp, hs_area
 
 
-    def calculate_hotspot_metric_rate_of_change(T_cases, cases_range, n_timesteps):
+    def calculate_hotspot_metric_rate_of_change(self, T_cases, cases_range, n_timesteps):
         """
         :param T_cases:         (numpy) temperature fields for different cases
         :param cases_range:     (tuple) range of cases to test
@@ -279,7 +279,7 @@ class em_loss:
         """
         hotspot_areas, hotspot_temperatures = [], []
         for i in range(cases_range[0], cases_range[1]):
-            hotspot_areas_i, hotspot_temperatures_i = _calculate_hotspot_metric(
+            hotspot_areas_i, hotspot_temperatures_i = self._calculate_hotspot_metric(
                 T_cases[i, :, :, :], n_timesteps
             )
             hotspot_areas.append(hotspot_areas_i)
