@@ -14,8 +14,6 @@ Differentiator for EM problems:
 """
 
 def differentiator_em(image_size, n_state_var=3):
-    # Model initiation
-    ## changing to  128 and 216 given ratio 600 x 1000
     feature_extraction = layer.feature_extraction_unet(input_shape = (image_size[0], image_size[1]), n_channel=n_state_var+2)
     
     mapping_and_recon = []
@@ -28,7 +26,7 @@ def differentiator_em(image_size, n_state_var=3):
     velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (image_size[0], image_size[1]), n_mask_channel=2, output_channel=2)
 
     # Main computation graph
-    input_tensor = Input(shape=(image_size[0] , 208, n_state_var+2), dtype = tf.float32)
+    input_tensor = Input(shape=(image_size[0] , image_size[1], n_state_var+2), dtype = tf.float32)
     init_state_var = input_tensor[:,:,:,:n_state_var]
     velocity_field = input_tensor[:,:,:,n_state_var:]
 
