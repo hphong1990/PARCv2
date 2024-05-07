@@ -28,6 +28,7 @@ def clip_raw_data(sequence_length=2, n_state_var=3, purpose = "diff_training", f
             print(f"Processing {filename}")
             raw_data = np.float32(np.load(file_path))
             data_shape = raw_data.shape
+            print(data_shape)
             
             # ensures the data will work for the sequence length
             if data_shape[2] > sequence_length:
@@ -65,7 +66,12 @@ def clip_raw_data(sequence_length=2, n_state_var=3, purpose = "diff_training", f
                                                         for k in range(sequence_length)], axis=-1) \
                                                         for j in range (j_range)] 
 
-            
+                
+                # Print shapes for debugging
+                print("State seq case shapes:", [seq.shape for seq in state_seq_case])
+                print("Vel seq case shapes:", [seq.shape for seq in vel_seq_case])
+
+                
                 state_seq_whole.extend(state_seq_case)
                 vel_seq_whole.extend(vel_seq_case)
 
