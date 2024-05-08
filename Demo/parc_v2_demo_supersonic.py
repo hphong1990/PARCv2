@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import parc.model.model_hypersonic as model
+import parc.model.model_supersonic as model
 import argparse
 
 
