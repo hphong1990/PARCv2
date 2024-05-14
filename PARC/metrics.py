@@ -5,21 +5,23 @@ from sklearn.metrics import mean_squared_error
 import torch
 
 # ================================================================= #
-#                                                                   #
-#               Metrics for Burgers problems                        #               
-#                                                                   #
+#               Metrics for Burgers problems                        #
+#      (Currently in Pytorch, will be transformed to numpy)         #
 # ================================================================= #
 
 class BurgersPdeLoss:
     def __init__(self, dt=1.0, dx=1.0, **kwargs):
         super(BurgersPdeLoss, self).__init__(**kwargs)
+        # Set time step size and grid size
         self.dt = dt
         self.dx = dx
     
     def set_data(self, snapshot_data):
+        # Set data
         self.snaphshot_data = snapshot_data
         
     def Laplacian(self, mat):
+        # Compute the laplacian
         dY, dX = torch.gradient(mat, spacing=self.dx)
         dYY, _ = torch.gradient(dY, spacing=self.dx)
         _, dXX = torch.gradient(dX, spacing=self.dx)
@@ -27,21 +29,27 @@ class BurgersPdeLoss:
         return laplacian
     
     def TimeDerivative (self,U0, U1, U2):
+        # Compute the time derivative using FD
         return ((U1 - U0) + (U2 - U1))/2.0/self.dt
 
     def SnapshotPdeLoss(self, U0, V0, U1, V1, U2, V2, nu=1.0):
+        # Compute laplacian
         laplace_u = self.Laplacian(U1)
         laplace_v = self.Laplacian(V1)
 
+        # Compute spatial derivative
         u_x, u_y = torch.gradient(U1, spacing=self.dx)
         v_x, v_y = torch.gradient(V1, spacing=self.dx)
 
+        # Compute time derivative
         u_t_lhs = self.TimeDerivative(U0, U1, U2)
         v_t_lhs = self.TimeDerivative(V0, V1, V2)
-        # governing equation
+
+        # RHS of the PDE
         u_t_rhs = nu * laplace_u - U1 * u_x - V1 * u_y
         v_t_rhs = nu * laplace_v - U1 * v_x - V1 * v_y
 
+        # Compute the PDE residual
         delta_u = torch.abs(u_t_lhs - u_t_rhs)
         delta_v = torch.abs(v_t_lhs - v_t_rhs)
         return delta_u, delta_v
@@ -50,6 +58,7 @@ class BurgersPdeLoss:
         sequence_length = len(self.snaphshot_data)
         fu = []
         fv = []
+        # Loop through the whole sequence and compute the PDE residual for u and v
         for i in range(1, sequence_length-1):
             du, dv = self.SnapshotPdeLoss(self.snaphshot_data[i-1][0,:,:],
                                               self.snaphshot_data[i-1][1,:,:], 
@@ -59,26 +68,30 @@ class BurgersPdeLoss:
                                               self.snaphshot_data[i+1][1,:,:],nu)
             fu.append(du.reshape(1, du.shape[0], du.shape[1]))
             fv.append(dv.reshape(1, du.shape[0], du.shape[1]))
+        
+        # Combine to make tensor
         fu = torch.cat(fu, dim=0)
         fv = torch.cat(fv, dim=0)
         return fu, fv
 
 # ================================================================= #
-#                                                                   #
-#               Metrics for Navier-Stokes problems                  #               
-#                                                                   #
+#               Metrics for Navier-Stokes problems                  #
+#      (Currently in Pytorch, will be transformed to numpy)         #
 # ================================================================= #
 
 class NSPdeLoss:
     def __init__(self, dt=1.0, dx=1.0, **kwargs):
         super(NSPdeLoss, self).__init__(**kwargs)
+        # Set time step size and grid size
         self.dt = dt
         self.dx = dx
     
     def set_data(self, snapshot_data):
+        # Set data
         self.snaphshot_data = snapshot_data
         
     def Laplacian(self, mat):
+        # Compute the laplacian
         dY, dX = torch.gradient(mat, spacing=self.dx)
         dYY, dYX = torch.gradient(dY, spacing=self.dx)
         dXY, dXX = torch.gradient(dX, spacing=self.dx)
@@ -86,23 +99,28 @@ class NSPdeLoss:
         return laplacian
     
     def TimeDerivative (self,U0, U1, U2):
+        # Compute the time derivative using FD
         return ((U1 - U0) + (U2 - U1))/2.0/self.dt
 
     def SnapshotPdeLoss(self, U0, V0, U1, V1, U2, V2, P1, rho=1.0, nu=1.0):
+        # Compute the laplacian
         laplace_u = self.Laplacian(U1)
         laplace_v = self.Laplacian(V1)
 
+        # Compute spatial derivative
         u_x, u_y = torch.gradient(U1, spacing=self.dx)
         v_x, v_y = torch.gradient(V1, spacing=self.dx)
         p_x, p_y = torch.gradient(P1, spacing=self.dx)
 
+        # Compute the time derivative
         u_t_lhs = self.TimeDerivative(U0, U1, U2)
         v_t_lhs = self.TimeDerivative(V0, V1, V2)
-        # governing equation
+        # Compute the RHS of the PDE
         u_t_rhs = nu * laplace_u - U1 * u_x - V1 * u_y - p_x
         v_t_rhs = nu * laplace_v - U1 * v_x - V1 * v_y - p_y
         p_t_rhs = u_x + v_y
 
+        # Compute the PDE residual
         delta_u = torch.abs(u_t_lhs - u_t_rhs)
         delta_v = torch.abs(v_t_lhs - v_t_rhs)
         delta_p = torch.abs(p_t_rhs)
