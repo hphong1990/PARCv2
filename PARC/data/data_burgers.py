@@ -24,18 +24,21 @@ class DataBurgers(BaseData):
             base_multiplier = 100
             folder_path = './data/burgers/test/'
         # Looping through the file list
-        for R in R_list:
-            for a in a_list:
-                for w in w_list:
+        for R in R_list: # Loop through Re number list
+            for a in a_list:    # Loop through signal magnitude list
+                for w in w_list:    # Loop through signal width list
                     data_file_name = base_name + str(int(R)) + '_' + str(int(a*base_multiplier)) + '_' + str(int(w*base_multiplier)) + '.npy'
                     file_path = folder_path + data_file_name                
-                    if os.path.exists(file_path):
+                    if os.path.exists(file_path): # Check if path exist
                         # Load data
                         raw_data = np.float32(np.load(file_path))
                         # Reorganize tensor shape
                         raw_data = np.moveaxis(raw_data,-2,0)
                         data_shape = raw_data.shape
+                        # Compute the number of steps
                         num_time_steps = data_shape[0]
+
+                        # Create constant tensor
                         norm_r = R/15000
                         r_img = norm_r*np.ones(shape = (1,data_shape[1],data_shape[2],1))
                         
@@ -47,6 +50,7 @@ class DataBurgers(BaseData):
                         for j in range (looping_range):
                             # Assemble first step
                             init_snapshot = np.concatenate([raw_data[j:j+1, :, :, :],r_img],axis = -1)
+
                             # Collect the rest
                             following_snapshot = []
                             for k in range(sequence_length-1):
@@ -55,7 +59,7 @@ class DataBurgers(BaseData):
                             # Assemble all
                             vel_seq_case = np.concatenate([init_snapshot,following_snapshot],axis = -1)
                             vel_seq_whole.append(vel_seq_case)
-
+        # Make data tensor
         vel_seq_whole = np.concatenate(vel_seq_whole, axis=0)
         return vel_seq_whole
     
