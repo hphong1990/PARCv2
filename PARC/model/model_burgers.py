@@ -80,7 +80,7 @@ class PARCv2_burgers(PARCv2):
         # Concatenate
         advec_diff_concat = Concatenate(axis=-1)([advec_u,advec_v,diffusion_u,diffusion_v])
         
-        # Final mapping
+        # Combine and compute time derivatives
         velocity_dot = velocity_mapping_and_recon([dynamic_feature, advec_diff_concat])
         
         # Create differentiator model
@@ -88,6 +88,10 @@ class PARCv2_burgers(PARCv2):
         return differentiator
 
     def build_integrator(self):
+        """
+        Integrator definition customized for Burgers' problems
+
+        """
         # Initialize neural networks
         # Create neural network for integrator
         velocity_integrator = layer.integrator_cnn(input_shape = (64,64), n_base_features = 64, n_output=2)
@@ -110,6 +114,9 @@ class PARCv2_burgers(PARCv2):
         ]
     
     def call(self, input_tensor):
+        """
+        Inference function, use to make prediction after training
+        """
         # Convert input to tf_float32
         input_seq_current = tf.cast(input_tensor,dtype = tf.float32)
 
@@ -159,7 +166,6 @@ class PARCv2_burgers(PARCv2):
             if self.mode == "integrator_training":  # If training the integrator
                 for _ in range(self.n_time_step):
                     # Solve using numerical integration
-
                     velocity_next, update = self.explicit_update(input_seq_current)
 
                     # Compute the high order term using hybrid int and add to previous output
