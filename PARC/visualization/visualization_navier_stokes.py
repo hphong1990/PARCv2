@@ -18,14 +18,10 @@ def plot_field_evolution(y_pred, y_true, case_id):
     :state_var_type:        (str)   indicate which fields to plot the result to apply correct scaling
     """
 
-    # get correct scaling terms
-    opts = 0
-    opts_2 = 0
     step = 17
-    max_val = 2.5   # min temperature (K)
-    min_val = 0  # max temperature (K)
+    max_val = 2.5  
+    min_val = 0  
     unit = "(m/s)"
-    w = 3
     Y, X = np.mgrid[0:127:128j, 0:255:256j]
     print(X.shape)
     # plot the prediction results
@@ -40,13 +36,7 @@ def plot_field_evolution(y_pred, y_true, case_id):
         ax[0][i].set_xticks([])
         ax[0][i].set_yticks([])
         
-        # im2 = ax[0][i].streamplot(X[:,:], Y[:, :],
-        #     y_true[case_id, :, :, (i * step + 1) * 3  + 0], y_true[case_id,:, :, (i * step + 1) * 3 + 1],
-        #     linewidth = 3,
-        #     # scale=18,
-        #     color='black',
-        #     density = [0.25, 0.25]
-        # )
+        # Plot ground truth
         im = ax[0][i].imshow(
             np.squeeze(np.sqrt(y_true[case_id, :, :, (i * step + 3) * 3 + 0]**2 + y_true[case_id, :, :, (i * step + 3) * 3 + 1]**2)),
             # cmap="bwr",
@@ -54,16 +44,9 @@ def plot_field_evolution(y_pred, y_true, case_id):
             vmax=max_val,
         )
         ax[0][i].set_title(("%.2f" % x_num[i * step + 3] + " (s)"), fontsize = 44)
-        
-        
-            
+
+        # Plot prediction
         for j in range(4):
-            # ax[j+1][i].set_xticks([])
-            # ax[j+1][i].set_yticks([])
-            # ax[j+1][i].streamplot(X[:,:], Y[:,:],
-            #     y_pred[j][case_id, :, :,(i * step + 1) * 3 + 0], y_pred[j][case_id, :, :, (i * step + 1) * 3 + 1],
-            #     linewidth = 3, density = [0.25, 0.25],
-            #     color='black')
             ax[j+1][i].imshow(
                 np.squeeze(np.sqrt(y_pred[j][case_id, :, :, (i * step + 3) * 3 + 0]**2 + y_pred[j][case_id, :, :, (i * step + 3) * 3 + 1]**2)),
                 # cmap="bwr",
@@ -74,8 +57,6 @@ def plot_field_evolution(y_pred, y_true, case_id):
             ax[j+1][i].set_yticks([])
     ax[0][0].set_ylabel("Ground \n truth", fontsize=40)
     ax[1][0].set_ylabel("PARCv2", fontsize=40)
-    # ax[2][0].set_ylabel("PARC \n (n)", fontsize=40)
-    # ax[3][0].set_ylabel("PARC \n (d)", fontsize=40)
     ax[2][0].set_ylabel("FNO", fontsize=40)
     ax[3][0].set_ylabel("PhyCRNet", fontsize=40)
     ax[4][0].set_ylabel("PI-FNO", fontsize=40)
@@ -95,39 +76,32 @@ def plot_field_evolution(y_pred, y_true, case_id):
 def pde_mse_div_Re(mse_whole, pde_whole, div_whole, Re_list):
     # MSE/PDE vs R
     name = ['PARCv2','FNO','PhyCRNet','PIFNO']
-    marker=['o', "v", "D", "H", "p"]
     linestyle=['-', '-', '-', '-', '--', '--']
     color = ['blue','green','black','red']
 
-    markersize=[10, 10, 8,10,10]
     fig, ax = plt.subplots(1, 3, figsize=(19, 5), gridspec_kw={"hspace":0.5, "wspace": 0.6})
-    # ax[0] = plt.subplots(3, 1, figsize=(4.5, 8), gridspec_kw={"hspace":0.01, "wspace": 0.01},
-    #                        sharex="col")
-    # fig.suptitle('RMSE, PDE residual and divergent-free condition errors variations \n w.r.t Reynold number', fontsize=24)
     plt.subplots_adjust(top=0.8) 
 
+    # MSE vs R
     for i in range(4):
-        # mse_pinn_r = np.nanmean(mse_whole[i], axis=(1,2))
         ax[0].plot(Re_list, mse_whole[i], marker = 'o', color = color[i], linewidth = 1.5, markersize = 6, linestyle = linestyle[i])
-        # ax[0].plot(R_list, mse_parc_r, "bo--", label="PARCv2")
 
     ax[0].add_patch(Rectangle((100, 0), 800, 100, fc = 'gray', ec = 'none', alpha = 0.7))
-    # ax[0].set_xscale("log")
     ax[0].set_ylabel("RMSE $(m/s)$", fontsize=22)
     ax[0].set_xlabel("Re", fontsize=22)
 
+    # PDE vs R
     for i in range(4):
         ax[1].plot(Re_list, pde_whole[i], "o", color = color[i], linewidth = 1.5, markersize = 6, linestyle = linestyle[i])
         
-    # ax[1].set_xscale("log")
     ax[1].set_ylabel(r"PDE residual $(m/s^2)$", fontsize=22)
     ax[1].set_xlabel("Re", fontsize=22)
     ax[1].add_patch(Rectangle((100, 0), 800, 10000, fc = 'gray', ec = 'none', alpha = 0.7))
 
+    # Div. cond vs R
     for i in range(4):
         ax[2].plot(Re_list, div_whole[i], "o", color = color[i], linewidth = 1.5, markersize = 6, linestyle = linestyle[i], label=name[i])
         
-    # ax[2].set_xscale("log")
     ax[2].set_ylabel("Divergent-free condition \n error $(1/s)$", fontsize=22)
     ax[2].set_xlabel("Re", fontsize=22)
     ax[2].add_patch(Rectangle((100, 0), 800, 20, fc = 'gray', ec = 'none', alpha = 0.7, label = 'Covered by training set'))
@@ -136,8 +110,8 @@ def pde_mse_div_Re(mse_whole, pde_whole, div_whole, Re_list):
     ax[2].tick_params(axis='both', which='major', labelsize=20)
 
     ax[2].set_ylim(0.001,15)
-    # ax[1].tick_params(axis='y', which='minor', labelsize=18)
 
+    # Denote the training R range
     for i in range(2):
         ax[i].set_yscale("log")
         ax[i].tick_params(axis='both', which='major', labelsize=20)
@@ -146,10 +120,6 @@ def pde_mse_div_Re(mse_whole, pde_whole, div_whole, Re_list):
     fig.legend(fontsize=22, ncol = 5, loc = 8,  bbox_to_anchor=(0.51, -0.18))
 
     fig.savefig("./mse_pde_R_ns.png", bbox_inches='tight', pad_inches=0.05)
-
-
-
-# fig.savefig("./mse_pde_R_ns_b.png", bbox_inches='tight', pad_inches=0.05)
 
 
 
