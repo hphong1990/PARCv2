@@ -2,6 +2,7 @@
 <h3>Phong C.H. Nguyen, Xinlun Cheng, Shahab Azarfar, Pradeep Seshadri, Yen T. Nguyen, Munho Kim, Sanghun Choi, H.S. Udaykumar, Stephen Baek</h3>
 
 <h2> Highlights <h2>
+
 - Differentiator-Integrator architecture inherited from the recent physics-aware recurrent convolutions <a href="https://www.science.org/doi/10.1126/sciadv.add6868">(PARC)</a>
 - Learning the spatiotemporal dynamics governed by the advection-diffusion-reaction equation
 - Aiming for unsteady, fast transient, and advection-dominated physics problems 
