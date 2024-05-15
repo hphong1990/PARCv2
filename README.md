@@ -1,7 +1,7 @@
 <h1><a href="https://arxiv.org/abs/2402.12503">PARCv2: Physics-aware Recurrent Convolutional Neural Networks for Spatiotemporal Dynamics Modeling</a></h1>
 <h3>Phong C.H. Nguyen, Xinlun Cheng, Shahab Azarfar, Pradeep Seshadri, Yen T. Nguyen, Munho Kim, Sanghun Choi, H.S. Udaykumar, Stephen Baek</h3>
 
-<h2> Highlights <h2>
+<h2> Highlights </h2>
 
 - Differentiator-Integrator architecture inherited from the recent physics-aware recurrent convolutions <a href="https://www.science.org/doi/10.1126/sciadv.add6868">(PARC)</a>
 - Learning the spatiotemporal dynamics governed by the advection-diffusion-reaction equation
@@ -10,8 +10,8 @@
 - Hybrid numerical-data driven integration
 - Tested with various benchmark dynamic problems with varying level of advection-dominance.
 
-<h2> Some examples from various benchmark problems <h2>
-<h3> 2D Burgers' <h3>
+<h2> Some examples from various benchmark problems </h2>
+<h3> 2D Burgers' </h3>
 <!-- <p align="center">
   <img src="https://user-images.githubusercontent.com/55661641/135554104-ef5ee5dd-a707-4448-9634-89b23a4c8858.gif" width="200">
   <img src="https://user-images.githubusercontent.com/55661641/135554152-ab0d830e-e2eb-489e-8faf-8b9298072a36.gif" width="200">
@@ -20,26 +20,26 @@
 </p> -->
 (to be cont.)
 
-<h3> 2D Navier-Stokes for Unsteady Flow <h3>
+<h3> 2D Navier-Stokes for Unsteady Flow </h3>
 (to be cont.)
-<h3> 2D Supersonic flow <h3>
+<h3> 2D Supersonic flow </h3>
 (to be cont.)
-<h3> Energy localization of energetic materials <h3>
+<h3> Energy localization of energetic materials </h3>
 (to be cont.)
 
-<h2> Requirements <h2>
+<h2> Requirements </h2>
 
 - Python 3.6.13
 - Tensorflow
 - Etc. (to be cont.)
 
-<h2> Dataset <h2>
+<h2> Dataset </h2>
 (to be cont.)
-<h2> Codes <h2>
+<h2> Codes </h2>
 (to be cont.)
-<h2> Tutorials <h2>
+<h2> Tutorials </h2>
 (to be cont.)
-<h2> Citation <h2>
+<h2> Citation </h2>
 If you find PARCv2 helpful, please consider citing us with：
 
 ```
