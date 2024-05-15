@@ -6,9 +6,7 @@
 - Differentiator-Integrator architecture inherited from the recent physics-aware recurrent convolutions <a href="https://www.science.org/doi/10.1126/sciadv.add6868">(PARC)</a>
 - Learning the spatiotemporal dynamics governed by the advection-diffusion-reaction equation
 - Aiming for unsteady, fast transient, and advection-dominated physics problems 
-- Neural network is designed to have the structure of the advection-diffusion-reaction equation
-- Hybrid numerical-data driven integration
-- Tested with various benchmark dynamic problems with varying level of advection-dominance.
+- Validated with various benchmark dynamic problems with varying level of advection-dominance.
 
 <h2> Some examples from various benchmark problems </h2>
 <h3> 2D Burgers' </h3>
