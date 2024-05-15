@@ -100,7 +100,7 @@ def pde_mse_R(mse_whole, pde_whole, R_list):
         pde_pinn_r = np.mean(pde_whole[i], axis=(1,2))
         ax[1].plot(R_list, pde_pinn_r, "o", linewidth = 1.5, color = color[i], markersize = 6, linestyle = linestyle[i])
     
-    # Some plot setting
+    
     ax[1].set_xscale("log")
     ax[1].set_ylabel(r"PDE residual $(cm/s^2)$", fontsize=22)
     ax[1].set_xlabel("Re", fontsize=22)
