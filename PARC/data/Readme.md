@@ -1,1 +1,0 @@
-<h1>Introduction to the Data Format and Processing Pipeline</h1>
