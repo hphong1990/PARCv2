@@ -11,7 +11,7 @@
 <h2> Some examples from various benchmark problems </h2>
 <h3> 2D Burgers' </h3>
 <p align="center">
-<img src= "https://github.com/hphong1990/PARCv2/assets/22065833/085f021d-5d2b-47cd-a9e9-07591cc6b64b">
+<video  src= "https://github.com/hphong1990/PARCv2/assets/22065833/085f021d-5d2b-47cd-a9e9-07591cc6b64b"></video>
 </p>
 
 <h3> 2D Navier-Stokes for Unsteady Flow </h3>
