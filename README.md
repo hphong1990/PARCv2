@@ -10,20 +10,11 @@
 
 <h2> Some examples from various benchmark problems </h2>
 <h3> 2D Burgers' </h3>
-<!-- <p align="center">
-  <img src="https://user-images.githubusercontent.com/55661641/135554104-ef5ee5dd-a707-4448-9634-89b23a4c8858.gif" width="200">
-  <img src="https://user-images.githubusercontent.com/55661641/135554152-ab0d830e-e2eb-489e-8faf-8b9298072a36.gif" width="200">
-  <img src="https://user-images.githubusercontent.com/55661641/135554156-efd65c12-2ab2-4ceb-bb3e-719cdf636710.gif" width="200">
-  <img src="https://user-images.githubusercontent.com/55661641/135554165-1d4f9d41-795f-4d4d-b7fa-0299b2c45fca.gif" width="200">
-</p> -->
-(to be cont.)
-
+<img src ="https://github.com/hphong1990/PARCv2/assets/22065833/289bb68a-ffd6-4c2a-8e12-139df17a6ead">
 <h3> 2D Navier-Stokes for Unsteady Flow </h3>
-(to be cont.)
-<h3> 2D Supersonic flow </h3>
-(to be cont.)
+<img src = "https://github.com/hphong1990/PARCv2/assets/22065833/c112d3e5-2865-448c-a9b2-6ff2298dd5de">
 <h3> Energy localization of energetic materials </h3>
-(to be cont.)
+<img src = "https://github.com/hphong1990/PARCv2/assets/22065833/65fdb43d-c65b-44d1-8b33-a55f33790db2">
 
 <h2> Requirements </h2>
 
