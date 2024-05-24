@@ -10,12 +10,9 @@
 
 <h2> Some examples from various benchmark problems </h2>
 <h3> 2D Burgers' </h3>
-<!-- <p align="center">
-  <img src="https://user-images.githubusercontent.com/55661641/135554104-ef5ee5dd-a707-4448-9634-89b23a4c8858.gif" width="200">
-  <img src="https://user-images.githubusercontent.com/55661641/135554152-ab0d830e-e2eb-489e-8faf-8b9298072a36.gif" width="200">
-  <img src="https://user-images.githubusercontent.com/55661641/135554156-efd65c12-2ab2-4ceb-bb3e-719cdf636710.gif" width="200">
-  <img src="https://user-images.githubusercontent.com/55661641/135554165-1d4f9d41-795f-4d4d-b7fa-0299b2c45fca.gif" width="200">
-</p> -->
+<p align="center">
+https://github.com/hphong1990/PARCv2/assets/22065833/085f021d-5d2b-47cd-a9e9-07591cc6b64b
+</p>
 (to be cont.)
 
 <h3> 2D Navier-Stokes for Unsteady Flow </h3>
