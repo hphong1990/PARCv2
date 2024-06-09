@@ -7,61 +7,74 @@ from skimage.measure import block_reduce
 class EnergeticMatDataPipeLine:
     def __init__(self, **kwargs):
         super(EnergeticMatDataPipeLine, self).__init__(**kwargs)
-    
-    def clip_raw_data(idx_range, sequence_length=2, n_state_var=3, purpose = "diff_training"):
-        state_seq_whole = []
-        vel_seq_whole = []
 
-        for i in range(idx_range[0],idx_range[1]):
-            file_path = os.path.join(os.sep,'scratch','xc7ts','fno', 'em', 'single_void_data', f'void_{i}.npy')
-            if os.path.exists(file_path):
-                print(f'void_{i}')
-                raw_data = np.float32(np.load(file_path))
-                data_shape = raw_data.shape
-                if data_shape[2] > sequence_length:
-                    npad = ((0, abs(data_shape[0] - 512)), (0, abs(data_shape[1] - 1024)), (0, 0))
-                    raw_data = np.pad(raw_data, pad_width=npad, mode='edge')
-                    raw_data = np.expand_dims(raw_data, axis=0)
-                    raw_data = skimage.measure.block_reduce(raw_data[:,:,:,:], (1,4,4,1),np.max)
-
-                    data_shape = raw_data.shape
-                    num_time_steps = data_shape[-1] // (n_state_var + 2)
-                    if purpose == "diff_training":
-                        j_range = num_time_steps - sequence_length
-                    else:
-                        j_range = 1
-                    state_seq_case = [np.concatenate([raw_data[:, :, :192, (j + k) * (n_state_var + 2):\
-                                                            (j + k) * (n_state_var + 2) + n_state_var] \
-                                                            for k in range(sequence_length)], axis=-1) \
-                                                            for j in range  (j_range)] 
-
-                    vel_seq_case = [np.concatenate([raw_data[:, :, :192, (j + k) * (n_state_var + 2) +  n_state_var :\
-                                                            (j + k) * (n_state_var + 2) + n_state_var + 2] \
-                                                            for k in range(sequence_length)], axis=-1) \
-                                                            for j in range (j_range)] 
-
-                
-                    state_seq_whole.extend(state_seq_case)
-                    vel_seq_whole.extend(vel_seq_case)
-
-        state_seq_whole = np.concatenate(state_seq_whole, axis=0)
-        vel_seq_whole = np.concatenate(vel_seq_whole, axis=0)
+    def clip_raw_data(self, dataset_range, dir_dataset, n_seq=2, n_state=3, mode_diff = True, tgt_sz = (512,1024), dim_reduce = 4):
+        """ 
+        Process single void simulation data to construct dataset. 
         
-        return state_seq_whole, vel_seq_whole
+        It takes single void simulations in their individual numpy files with the following notes: 
+            1) each simulation has a different number of time steps
+            2) in the format of (1, X, Y, timestep + state + velocity)
+            3) From raw data, Temperature has been clipped to [300, 5000], microstructure has been binarized, and Pressure untouched
+        Args:
+            dataset_range: (tuple) range of void cases to include
+            dir_dataset: (str) directory containing void simulations
+            n_seq: (int) number of timesteps for sequence to consider, i.e., n_seq=2 yield sample t_i and t_i+1
+            n_state: (int) number of state variables, (def=3: temperature, pressure, and microstructure)
+            mode_diff: (bool) flat for sequence sampling
+            tgt_sz: (int, int) output spatial dimension
+            dim_reduce: (int) factor of downsampling
+        Returns:
+            X_dataset (numpy): (cases + timesteps, X, Y, state * n_seq)
+            U_dataset (numpy): (cases + timesteps, X, Y, velocity * n_seq)
+        """
 
-    # Normalization
-    def data_normalization(input_data,no_of_channel):
-        norm_data = np.zeros(input_data.shape)
-        min_val = []
-        max_val = []
-        for i in range(no_of_channel):
-            norm_data[:,:,:,i::no_of_channel] = ((input_data[:,:,:,i::no_of_channel] - np.amin(input_data[:,:,:,i::no_of_channel])) / (np.amax(input_data[:,:,:,i::no_of_channel]) - np.amin(input_data[:,:,:,i::no_of_channel])) + 1E-9)
-            min_val.append(np.amin(input_data[:,:,:,i::no_of_channel]))
-            max_val.append(np.amax(input_data[:,:,:,i::no_of_channel]))
-        return norm_data, min_val, max_val
+        X_dataset, U_dataset = [], []
+        n_dataset = 0
 
-    def data_normalization_test(input_data, min_val, max_val, no_of_channel):
-        norm_data = np.zeros(input_data.shape)
-        for i in range(no_of_channel):
-            norm_data[:,:,:,i::no_of_channel] = ((input_data[:,:,:,i::no_of_channel] - min_val[i]) / (max_val[i] - min_val[i] + 1E-9))
-        return norm_data
+        for case_idx in range(dataset_range[0], dataset_range[1]): 
+            dir_case = osp.join( dir_dataset, 'void_' + str(case_idx) + '.npy' )
+            if osp.exists( dir_case ):
+                n_dataset += 1
+                data = np.float32( np.load( dir_case ) ) # (X, Y, ts + state + velocity)
+                n_ts = data.shape[-1] // (n_state + 2)
+
+                """ pad to target size and downsample """ 
+                npad = (
+                    (0, abs(data.shape[0] - tgt_sz[0])), 
+                    (0, abs(data.shape[1] - tgt_sz[1])), 
+                    (0,0))
+                data = np.pad(data, pad_width=npad, mode='edge')
+                data = np.expand_dims(data, axis=0) # (1, X, Y, ts + state + velocity)
+
+                data = skimage.measure.block_reduce(data, (1, dim_reduce, dim_reduce, 1), np.max)
+
+                ts = n_ts - n_seq if mode_diff else 1 # starting index range for sequence data
+
+                """ extract X and U """ 
+                X_extracted = [None] * ts
+                for ti in range(ts): # loop through different timesteps
+                    seq = [None] * n_seq
+                    for seq_i in range(n_seq): # loop through number of sequence
+                        st = (ti + seq_i) * (n_state + 2)
+                        end = st + n_state
+                        seq[seq_i] = data[..., st:end]
+                    seq = np.concatenate( seq, axis=-1 )
+                    X_extracted[ti] = seq
+
+                U_extracted = [None] * ts
+                for ti in range(ts):
+                    seq = [None] * n_seq
+                    for seq_i in range(n_seq):
+                        st = (ti + seq_i) * (n_state + 2) + n_state
+                        end = st + 2
+                        seq[seq_i] = data[..., st:end]
+                    seq = np.concatenate( seq, axis=-1 )
+                    U_extracted[ti] = seq
+
+                X_dataset.extend( X_extracted ) 
+                U_dataset.extend( U_extracted )
+        X_dataset = np.concatenate(X_dataset, axis=0)
+        U_dataset = np.concatenate(U_dataset, axis=0)
+        print( f"Processed {n_dataset} simulation data into State {X_dataset.shape} and Velocity {U_dataset.shape}" )
+        return X_dataset, U_dataset
