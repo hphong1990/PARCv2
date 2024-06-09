@@ -60,6 +60,7 @@ def data_normalization_test(input_data, min_val, max_val, no_of_channel):
     norm_data = np.zeros(input_data.shape)
     for i in range(no_of_channel):
         norm_data[:,:,:,i::no_of_channel] = ((input_data[:,:,:,i::no_of_channel] - min_val[i]) / (max_val[i] - min_val[i] + 1E-9))
+    return norm_data
 
 def data_denormalization(input_data, min_val, max_val, no_of_channel):
     denorm_data = np.zeros(input_data.shape)

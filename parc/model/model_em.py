@@ -15,19 +15,19 @@ Differentiator for EM problems:
 
 def differentiator_em(n_state_var=3):
     # Model initiation
-    feature_extraction = layer.feature_extraction_unet(input_shape = (128, 192), n_channel=n_state_var+2)
+    feature_extraction = layer.feature_extraction_unet(input_shape = (192, 256), n_channel=n_state_var+2, n_base_features=32) #try base_feature = 32 or 16
     
     mapping_and_recon = []
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=2, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=1, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=1, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (192, 256), n_mask_channel=2, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (192, 256), n_mask_channel=1, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (192, 256), n_mask_channel=1, output_channel=1))
     
     advection = [layer.Advection() for _ in range(n_state_var+2)]
     diffusion = layer.Diffusion()
-    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (128, 192), n_mask_channel=2, output_channel=2)
+    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (192, 256), n_mask_channel=2, output_channel=2)
 
     # Main computation graph
-    input_tensor = Input(shape=(128 , 192, n_state_var+2), dtype = tf.float32)
+    input_tensor = Input(shape=(192 , 256, n_state_var+2), dtype = tf.float32)
     init_state_var = input_tensor[:,:,:,:n_state_var]
     velocity_field = input_tensor[:,:,:,n_state_var:]
 
@@ -64,15 +64,15 @@ def differentiator_em(n_state_var=3):
 def integrator(n_state_var = 3):
     state_integrators = []
     for _ in range(n_state_var):
-        state_integrators.append(layer.integrator_cnn(input_shape = (128,192)))
+        state_integrators.append(layer.integrator_cnn(input_shape = (192,256)))
 
-    velocity_integrator = layer.integrator_cnn(input_shape = (128,192), n_output=2)
+    velocity_integrator = layer.integrator_cnn(input_shape = (192,256), n_output=2)
 
-    state_var_prev = keras.layers.Input(shape = (128, 192, n_state_var), dtype = tf.float32)
-    velocity_prev = keras.layers.Input(shape = (128, 192,2), dtype = tf.float32)
+    state_var_prev = keras.layers.Input(shape = (192,256, n_state_var), dtype = tf.float32)
+    velocity_prev = keras.layers.Input(shape = (192,256,2), dtype = tf.float32)
     
-    state_var_dot = keras.layers.Input(shape = (128, 192,n_state_var), dtype = tf.float32)
-    velocity_dot = keras.layers.Input(shape = (128, 192,2), dtype = tf.float32)
+    state_var_dot = keras.layers.Input(shape = (192,256,n_state_var), dtype = tf.float32)
+    velocity_dot = keras.layers.Input(shape = (192,256,2), dtype = tf.float32)
 
     state_var_next = []
         
@@ -154,8 +154,13 @@ class PARCv2(keras.Model):
             state_pred = Concatenate(axis = -1)(state_whole)
             vel_pred = Concatenate(axis = -1)(vel_whole)
                     
-            total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_pred,state_var_gt) + 
-                            tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(vel_pred,velocity_gt))/2
+            # to include just one, rename to total loss
+#             mae_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_pred,state_var_gt) + 
+#                             tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(vel_pred,velocity_gt))/2
+            
+            mse_loss  = (tf.keras.losses.MeanSquaredError(reduction = 'sum')(state_pred,state_var_gt) + 
+                            tf.keras.losses.MeanSquaredError(reduction = 'sum')(vel_pred,velocity_gt))/2
+            total_loss = mse_loss  # mae_loss + 
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
 
