@@ -1,14 +1,19 @@
 import os
-from parc.data.base_data import BaseData
+from .base_data import BaseData
 import numpy as np
 import skimage
 from skimage.measure import block_reduce
+import os.path as osp
 
+# todo: makit it class seems unnecessary
 class DataEnergeticMaterials(BaseData):
     def __init__(self, **kwargs):
         super(DataEnergeticMaterials, self).__init__(**kwargs)
         # Download data
+        # todo: make it downloadable
 
+    # todo: commeent
+    # todo: not needed? 
     def information(self):
         print("Train ")
         pass
