@@ -35,8 +35,8 @@ class DataEnergeticMaterials(BaseData):
             tgt_sz: (int, int) output spatial dimension
             dim_reduce: (int) factor of downsampling
         Returns:
-            X_dataset (numpy): (cases + timesteps, X, Y, state * n_seq)
-            U_dataset (numpy): (cases + timesteps, X, Y, velocity * n_seq)
+            X_dataset (numpy): (cases + timesteps, X, Y, state * n_seq) state variable 
+            U_dataset (numpy): (cases + timesteps, X, Y, velocity * n_seq) velocity variable 
         """
 
         X_dataset, U_dataset = [], []
