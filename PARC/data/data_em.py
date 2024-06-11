@@ -18,7 +18,7 @@ class DataEnergeticMaterials(BaseData):
         print("Train ")
         pass
 
-    def clip_raw_data(self, dataset_range, dir_dataset, n_seq=2, n_state=3, mode_diff = True, tgt_sz = (512,1024), dim_reduce = 4):
+    def clip_raw_data(self, dataset_range, dir_dataset, n_seq=2, n_state=3, use_sldg_wdn = True, tgt_sz = (512,1024), dim_reduce = 4):
         """ 
         Process single void simulation data to construct dataset. 
         
@@ -31,7 +31,7 @@ class DataEnergeticMaterials(BaseData):
             dir_dataset: (str) directory containing void simulations
             n_seq: (int) number of timesteps for sequence to consider, i.e., n_seq=2 yield sample t_i and t_i+1
             n_state: (int) number of state variables, (def=3: temperature, pressure, and microstructure)
-            mode_diff: (bool) flat for sequence sampling
+            use_sldg_wdn: (bool) indicating if a sliding window is used to clip sequence
             tgt_sz: (int, int) output spatial dimension
             dim_reduce: (int) factor of downsampling
         Returns:
@@ -59,7 +59,7 @@ class DataEnergeticMaterials(BaseData):
 
                 data = skimage.measure.block_reduce(data, (1, dim_reduce, dim_reduce, 1), np.max)
 
-                ts = n_ts - n_seq if mode_diff else 1 # starting index range for sequence data
+                ts = n_ts - n_seq if use_sldg_wdn else 1 # starting index range for sequence data
 
                 """ extract X and U """ 
                 X_extracted = [None] * ts
