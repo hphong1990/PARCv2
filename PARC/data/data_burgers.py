@@ -4,6 +4,7 @@ import numpy as np
 import skimage
 from skimage.measure import block_reduce
 
+
 class DataBurgers(BaseData):
     def __init__(self, **kwargs):
         super(DataBurgers, self).__init__(**kwargs)
