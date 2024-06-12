@@ -9,7 +9,7 @@ from tensorflow.keras.models import Model
 from parc.model.base_model import PARCv2
 
 class PARCv2_EM(PARCv2):
-    def __init__(self, n_state_var, n_time_step, step_size, m_input_shape = (128,192), solver = "rk4", mode = "integrator_training", use_data_driven_int = True, *args,  **kwargs):
+    def __init__(self, n_state_var, n_time_step, step_size, solver = "rk4", mode = "integrator_training", use_data_driven_int = True, *args,  **kwargs):
         """
         Initilization of PARCv2 class:
         - n_time_step (float32): Define number of time step
@@ -29,12 +29,12 @@ class PARCv2_EM(PARCv2):
         self.solver = solver
         self.mode = mode
         self.use_data_driven_int = use_data_driven_int
-        self.input_shape = m_input_shape
+        
         # Construct differentiator
-        self.differentiator = self.build_differentiator(input_shape = self.input_shape, n_state_var=self.n_state_var)
+        self.differentiator = self.build_differentiator(n_state_var=self.n_state_var)
 
         # Construct integrator
-        self.integrator = self.build_integrator(input_shape = self.input_shape, n_state_var=self.n_state_var)
+        self.integrator = self.build_integrator(n_state_var=self.n_state_var)
 
         # Create loss metric
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
@@ -110,7 +110,7 @@ class PARCv2_EM(PARCv2):
         differentiator = Model(input_tensor, output_tensor)
         return differentiator
 
-    def build_integrator(self, m_input_shape = (128, 192), n_state_var = 3):
+    def build_integrator(self, n_state_var = 3, m_input_shape = (128, 192)):
         """
         Integrator definition customized for EM problems
 
