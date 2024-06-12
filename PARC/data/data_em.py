@@ -31,7 +31,7 @@ class DataEnergeticMaterials(BaseData):
             dir_dataset: (str) directory containing void simulations
             n_seq: (int) number of timesteps for sequence to consider, i.e., n_seq=2 yield sample t_i and t_i+1
             n_state: (int) number of state variables, (def=3: temperature, pressure, and microstructure)
-            use_sldg_wdn: (bool) indicating if a sliding window is used to clip sequence
+            use_sldg_wdn: (bool) indicating if a sliding window is used to clip time sequence
             tgt_sz: (int, int) output spatial dimension
             dim_reduce: (int) factor of downsampling
         Returns:
