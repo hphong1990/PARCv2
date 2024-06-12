@@ -3,7 +3,6 @@ import tensorflow as tf
 import parc.model.model_hypersonic as model
 import argparse
 
-
 # Create tf.dataset
 def load_tfdataset(mach_list, seq=2, len_load=120):
     for idx, each_mach in enumerate(mach_list):
