@@ -2,11 +2,11 @@ from tensorflow import keras
 from tensorflow.keras import  layers, regularizers
 from keras.layers import *
 import tensorflow as tf
-from parc import layer
+from PARC import layer
 
 from tensorflow.keras.layers import Concatenate, Input
 from tensorflow.keras.models import Model
-from parc.model.base_model import PARCv2
+from PARC.model.base_model import PARCv2
 
 class PARCv2_EM(PARCv2):
     def __init__(self, n_state_var, n_time_step, step_size, m_input_shape = (128,192), solver = "rk4", mode = "integrator_training", use_data_driven_int = True, *args,  **kwargs):
