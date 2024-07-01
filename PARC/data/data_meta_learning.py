@@ -7,7 +7,6 @@ from skimage.measure import block_reduce
   
 def clip_raw_data(sequence_length=2, n_state_var=3, purpose = "diff_training", folder_path='...', image_size = (128, 208)):
     
-    # idx_range: is used for splitting data into training and testing data, we will do this automatically in the future
     # sequence_length: the amount of time steps contained for one sequence
     # n_state_var: is the number of state variables our model considers - PARCv2 considers: Temperature, Pressure, and Microstructure
     # purpose: diff_training will chop data with a sliding window of size sequence length from any starting time step; else int_training it will takes from time zero to sequence length 
@@ -28,7 +27,7 @@ def clip_raw_data(sequence_length=2, n_state_var=3, purpose = "diff_training", f
             print(f"Processing {filename}")
             raw_data = np.float32(np.load(file_path))
             data_shape = raw_data.shape
-            print(data_shape)
+            
             
             # ensures the data will work for the sequence length
             if data_shape[2] > sequence_length:
@@ -37,6 +36,7 @@ def clip_raw_data(sequence_length=2, n_state_var=3, purpose = "diff_training", f
                 raw_data = np.expand_dims(raw_data, axis=0)
                 
                 # reduce the spatial size of the height and width
+                # 4 is dim_reduce
                 raw_data = skimage.measure.block_reduce(raw_data[:,:,:,:], (1,4,4,1),np.max)
                 
 
@@ -53,7 +53,7 @@ def clip_raw_data(sequence_length=2, n_state_var=3, purpose = "diff_training", f
                     # start from beginning to sequence length
                     j_range = 1
                     
-                ### changing 128 x 208
+
                 
                 ### TO DO:  Diagram for explaining process 
                 state_seq_case = [np.concatenate([raw_data[:, :image_size[0], :image_size[1], (j + k) * (n_state_var + 2):\
@@ -66,10 +66,6 @@ def clip_raw_data(sequence_length=2, n_state_var=3, purpose = "diff_training", f
                                                         for k in range(sequence_length)], axis=-1) \
                                                         for j in range (j_range)] 
 
-                
-                # Print shapes for debugging
-                print("State seq case shapes:", [seq.shape for seq in state_seq_case])
-                print("Vel seq case shapes:", [seq.shape for seq in vel_seq_case])
 
                 
                 state_seq_whole.extend(state_seq_case)
@@ -107,3 +103,34 @@ def data_denormalization(input_data, min_val, max_val, no_of_channel):
     for i in range(no_of_channel):
         denorm_data[:,:,:,i::no_of_channel] = (input_data[:,:,:,i::no_of_channel] * (max_val[i] - min_val[i] + 1E-9)) + min_val[i]
     return denorm_data
+
+
+def data_gt(sequence_length=2, n_state_var=3, folder_path='...', result_path='...'):
+    
+    data_whole = []
+    
+    # Loop through each file in the folder
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".npy"):
+            file_path = os.path.join(folder_path, filename)
+            print(f"Processing {filename}")
+            raw_data = np.float32(np.load(file_path))
+            data_shape = raw_data.shape
+            if data_shape[2] > sequence_length:
+                raw_data = np.expand_dims(raw_data, axis=0)
+                raw_data = skimage.measure.block_reduce(raw_data[:,:,:,:], (1,4,4,1),np.max)
+    
+                data_shape = raw_data.shape
+    
+                num_time_steps = data_shape[-1] // (n_state_var + 2)
+                
+                seq_case = raw_data[:,:,:,:sequence_length*(n_state_var+2)]
+                print(f"Shape of seq_case before appending: {seq_case.shape}")  # Add this line
+                data_whole.extend(seq_case)
+                print(f"Length of data_whole after appending: {len(data_whole)}")  # Add this line
+
+    data_whole = np.concatenate([data_whole], axis=0)
+    np.save(result_path, data_whole)
+    print("Ground truth saved!")
+
+    return data_whole

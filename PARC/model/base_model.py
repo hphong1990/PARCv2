@@ -8,7 +8,16 @@ from tensorflow.keras.layers import Concatenate, Input
 from tensorflow.keras.models import Model
 from abc import abstractmethod
 
-# @keras.saving.register_keras_serializable()
+"""
+This is the base PARCv2 class for model definition. 
+
+This base class include the explicit update scheme that is used for integration
+
+Users will need to subclassing this class and write their own differentiator and
+integrator implementation. Also, 'train_step' and 'validation_step' functions will
+also needed to be defined by the user
+
+"""
 class PARCv2(keras.Model):
     def __init__(self, **kwargs):
         super(PARCv2, self).__init__(**kwargs)
@@ -21,13 +30,15 @@ class PARCv2(keras.Model):
 
     # Update scheme
     def explicit_update(self, input_seq_current):
+        # Clipping input tensor to have the value from 0 to 1
         input_seq_current = tf.clip_by_value(input_seq_current, 0, 1)
 
-        if self.solver == "rk4":
+        # Select different solver
+        if self.solver == "rk4": # Runge-kutta 4th order 
             input_seq_current, update = self.rk4_update(input_seq_current)
-        elif self.solver == 'heun':
+        elif self.solver == 'heun': # Euler 2nd order
             input_seq_current, update = self.heun_update(input_seq_current)
-        else:
+        else: # Default: Euler 1st order
             input_seq_current, update = self.euler_update(input_seq_current)
 
         return input_seq_current, update
@@ -71,6 +82,7 @@ class PARCv2(keras.Model):
 
         k2 = self.differentiator(inp_k2)
         
+        # Final
         update = 1/2*(k1 + k2)
 
         final_states = input_seq_current[:,:,:,:2] + self.step_size*update 
