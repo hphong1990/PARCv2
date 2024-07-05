@@ -2,7 +2,7 @@ from tensorflow import keras
 from tensorflow.keras import  layers, regularizers
 from keras.layers import *
 import tensorflow as tf
-from PARC import layer
+from ...PARC import layer
 
 from tensorflow.keras.layers import Concatenate, Input
 from tensorflow.keras.models import Model
