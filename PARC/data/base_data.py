@@ -26,3 +26,6 @@ class BaseData:
         for i in range(no_of_channel):
             denorm_data[:,:,:,i::no_of_channel] = (input_data[:,:,:,i::no_of_channel] * (max_val[i] - min_val[i] + 1E-9)) + min_val[i]
         return denorm_data
+    
+    def data_binarization(self, input_data, threshold=0.5):
+        return (input_data >= threshold).astype(np.float32)
