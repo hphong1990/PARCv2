@@ -13,6 +13,8 @@ Differentiator for EM problems:
     - state vars including temperature, pressure, microstructure evolution
     - there is no constant field using
 """
+tf.keras.backend.set_floatx('float32')
+
 
 def differentiator_em(image_size, n_state_var=3):
     feature_extraction = layer.feature_extraction_unet(input_shape = (image_size[0], image_size[1]), n_channel=n_state_var+2)
@@ -27,7 +29,7 @@ def differentiator_em(image_size, n_state_var=3):
     velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (image_size[0], image_size[1]), n_mask_channel=2, output_channel=2)
 
     # Main computation graph
-    input_tensor = Input(shape=(image_size[0] , image_size[1], n_state_var+2), dtype = tf.float32)
+    input_tensor = Input(shape=(image_size[0] , image_size[1], n_state_var+2), dtype=tf.float32)
     init_state_var = input_tensor[:,:,:,:n_state_var]
     velocity_field = input_tensor[:,:,:,n_state_var:]
 
@@ -70,7 +72,7 @@ class PARCv2(keras.Model):
         self.step_size = step_size
         self.t_eval = tf.linspace(1, n_time_step, n_time_step) * step_size
         
-        self.differentiator = differentiator_em(n_state_var=self.n_state_var, image_size = image_size)
+        self.differentiator = differentiator_em(n_state_var=self.n_state_var, image_size=image_size)
         self.integrator = tfp.math.ode.DormandPrince(rtol=int_rtol, atol=int_atol)
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
 
@@ -81,35 +83,34 @@ class PARCv2(keras.Model):
         ]
     
     def _int_diff_call(self, t, y):
-        return self.differentiator(y)
+        return tf.cast(self.differentiator(y), dtype=tf.float32)
     
-    def call(self, input, t_eval):
-        state_var_init = tf.cast(input[0], dtype=tf.float64)
-        velocity_init = tf.cast(input[1], dtype=tf.float64)
+    @tf.function
+    def call(self, input):
+        state_var_init = tf.cast(input[0], dtype=tf.float32)
+        velocity_init = tf.cast(input[1], dtype=tf.float32)
         ic = Concatenate(axis = -1)([state_var_init, velocity_init])
-        res = self.integrator.solve(self._int_diff_call, 0.0, ic, solution_times=t_eval)
-        return res.states
+        res = self.integrator.solve(self._int_diff_call, 0.0, ic, solution_times=self.t_eval)
+        return res
 
     @tf.function
     def train_step(self, data):
-        state_var_init = tf.cast(data[0][0],dtype = tf.float64)
-        velocity_init = tf.cast(data[0][1], dtype = tf.float64)
+        state_var_init = tf.cast(data[0][0],dtype = tf.float32)
+        velocity_init = tf.cast(data[0][1], dtype = tf.float32)
         input_seq = Concatenate(axis = -1)([state_var_init, velocity_init])
 
-        state_var_gt = tf.cast(data[1][0], dtype = tf.float64)
-        velocity_gt = tf.cast(data[1][1], dtype = tf.float64)
+        state_var_gt = tf.cast(data[1][0], dtype = tf.float32)
+        velocity_gt = tf.cast(data[1][1], dtype = tf.float32)
 
         with tf.GradientTape() as tape:
-            results = dp_solver.solve(self._int_diff_call, 0.0, input_seq, solution_times=self.t_eval)
-            state_whole, vel_whole = results.states[:, :, :, :, :3], results.states[:, :, :, :, 3:]
-            state_pred = Concatenate(axis = -1)(state_whole)
-            vel_pred = Concatenate(axis = -1)(vel_whole)
-                    
-        total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_pred,state_var_gt) + 
-                       tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(vel_pred,velocity_gt))/2
+            tape.watch(self.differentiator.trainable_weights)
+            results = self.integrator.solve(self._int_diff_call, 0.0, input_seq, solution_times=self.t_eval)
+            state_pred, vel_pred = results.states[:, :, :, :, :self.n_state_var], results.states[:, :, :, :, self.n_state_var:]
+            total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_pred, state_var_gt) + 
+                           tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(vel_pred, velocity_gt)) / 2
+            
         grads = tape.gradient(total_loss, self.differentiator.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.differentiator.trainable_weights))
-
         self.total_loss_tracker.update_state(total_loss)
 
         return {
