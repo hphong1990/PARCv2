@@ -17,16 +17,16 @@ tf.keras.backend.set_floatx('float32')
 
 
 def differentiator_em(image_size, n_state_var=3):
-    feature_extraction = layer.feature_extraction_unet(input_shape = (image_size[0], image_size[1]), n_channel=n_state_var+2)
+    feature_extraction = layer.feature_extraction_resnet(input_shape=(image_size[0], image_size[1]), n_channel=n_state_var+2)
     
     mapping_and_recon = []
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (image_size[0], image_size[1]), n_mask_channel=2, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (image_size[0], image_size[1]), n_mask_channel=1, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape = (image_size[0], image_size[1]), n_mask_channel=1, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=2, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=1, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=1, output_channel=1))
     
     advection = [layer.Advection() for _ in range(n_state_var+2)]
     diffusion = layer.Diffusion()
-    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape = (image_size[0], image_size[1]), n_mask_channel=2, output_channel=2)
+    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=2, output_channel=2)
 
     # Main computation graph
     input_tensor = Input(shape=(image_size[0] , image_size[1], n_state_var+2), dtype=tf.float32)
