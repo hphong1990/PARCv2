@@ -17,7 +17,7 @@ tf.keras.backend.set_floatx('float32')
 
 
 def differentiator_em(image_size, n_state_var=3):
-    feature_extraction = layer.feature_extraction_resnet(input_shape=(image_size[0], image_size[1]), n_channel=n_state_var+2)
+    feature_extraction = layer.feature_extraction_resnet(input_shape=(image_size[0], image_size[1]), n_channel=n_state_var+2, n_out_features=128, n_base_features=[32, 64])
     
     mapping_and_recon = []
     mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=2, output_channel=1))
