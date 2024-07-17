@@ -164,6 +164,30 @@ def spade_generator_unit(x, mask, feats_out, kernel, upsampling=True, padding="C
     else:
         return output
 
+    
+def feature_extraction_resnet(input_shape=(128, 192), n_out_features=128, n_base_features=[32, 64], 
+                              kernel_size=3, n_channel=5, padding="CONSTANT"):
+    inputs = keras.Input(shape=(input_shape[0], input_shape[1], n_channel))
+    # 2 conv from n_channel to n_base_features[0]
+    pad_size = (kernel_size - 1) // 2
+    pad_instruct = tf.constant([[0, 0], [pad_size, pad_size], [pad_size, pad_size], [0, 0]])
+    x = tf.pad(inputs, pad_instruct, padding)
+    x = Conv2D(n_base_features[0], kernel_size, padding="valid")(x)
+    x = ReLU()(x)
+    x = tf.pad(x, pad_instruct, padding)
+    x = Conv2D(n_base_features[0], kernel_size, padding="valid")(x)
+    conv = ReLU()(x)
+    # Multiple resnet units
+    for i in range(1, len(n_base_features)):
+        if n_base_features[i-1] != n_base_features[i]:
+            conv = tf.pad(conv, pad_instruct, padding)
+            conv = Conv2D(n_base_features[i], kernel_size, padding="valid")(conv)
+        conv = resnet_unit(n_base_features[i], kernel_size, conv, padding=padding)
+    feature_out = Conv2D(n_out_features, 1, padding="valid")(conv)
+    unet = keras.Model(inputs, feature_out)
+    return unet
+
+    
 def feature_extraction_unet(input_shape=(128,192), n_out_features=128, n_base_features=64, n_channel=5,
                             padding="CONSTANT"):
     inputs = keras.Input(shape = (input_shape[0], input_shape[1],n_channel))
