@@ -7,13 +7,18 @@ from skimage.measure import block_reduce
 
 def dat2npy(metalearning_dir, species, data_shape=(600, 1000), timesteps=60, 
             timeskips=1000, temp_clip=[300, 5000],
-            filename_patterns=["xyuvpTLs_ts%i.dat", "xyuvpTLs_ts%07i.dat"]):
+            filename_patterns=["xyuvpTLs_ts%i.dat", "xyuvpTLs_ts%07i.dat"],
+            overwrite=False):
     data_dir = os.path.join(metalearning_dir, species)
     simulations_dir = glob.glob(os.path.join(data_dir, "*"))
     for sim_dir in simulations_dir:
         if not os.path.isdir(sim_dir):
             continue
         sim_id = os.path.basename(os.path.normpath(sim_dir))
+        if ((not overwrite) and os.path.isfile(os.path.join(data_dir, sim_id + ".npy"))):
+            print("Simulation ID %s has been converted and will not be overwritten." % sim_id)
+            continue
+        print("Begin processing Simulation ID %s" % sim_id)
         time_steps = [1]
         time_steps.extend([i * timeskips for i in range(1, timesteps)])
         # Start reading the files
