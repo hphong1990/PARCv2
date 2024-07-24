@@ -16,17 +16,17 @@ Differentiator for EM problems:
 tf.keras.backend.set_floatx('float32')
 
 
-def differentiator_em(image_size, n_state_var=3):
-    feature_extraction = layer.feature_extraction_resnet(input_shape=(image_size[0], image_size[1]), n_channel=n_state_var+2, n_out_features=128, n_base_features=[32, 64])
+def differentiator_em(image_size, n_state_var, n_out_features, n_base_features):
+    feature_extraction = layer.feature_extraction_resnet(input_shape=(image_size[0], image_size[1]), n_channel=n_state_var+2, n_out_features=n_out_features, n_base_features=n_base_features)
     
     mapping_and_recon = []
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=2, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=1, output_channel=1))
-    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=1, output_channel=1))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=2, output_channel=1, n_base_features=n_out_features))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=1, output_channel=1, n_base_features=n_out_features))
+    mapping_and_recon.append(layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=1, output_channel=1, n_base_features=n_out_features))
     
     advection = [layer.Advection() for _ in range(n_state_var+2)]
     diffusion = layer.Diffusion()
-    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=2, output_channel=2)
+    velocity_mapping_and_recon = layer.mapping_and_recon_cnn(input_shape=(image_size[0], image_size[1]), n_mask_channel=2, output_channel=2, n_base_features=n_out_features)
 
     # Main computation graph
     input_tensor = Input(shape=(image_size[0] , image_size[1], n_state_var+2), dtype=tf.float32)
@@ -65,14 +65,16 @@ def differentiator_em(image_size, n_state_var=3):
 
 
 class PARCv2(keras.Model):
-    def __init__(self, n_state_var, n_time_step, step_size, image_size=(0, 0), int_rtol=1e-3, int_atol=1e-6, int_max_steps_per_step=1000, **kwargs):
+    def __init__(self, n_state_var, n_time_step, step_size, image_size=(0, 0), 
+                 int_rtol=1e-3, int_atol=1e-6, int_max_steps_per_step=1000, 
+                 diff_fe_n_out_features=32, diff_fe_n_base_features=[16],
+                 **kwargs):
         super(PARCv2, self).__init__(**kwargs)
         self.n_state_var = n_state_var
         self.n_time_step = n_time_step
         self.step_size = step_size
         self.t_eval = tf.linspace(1, n_time_step, n_time_step) * step_size
-        
-        self.differentiator = differentiator_em(n_state_var=self.n_state_var, image_size=image_size)
+        self.differentiator = differentiator_em(image_size, n_state_var, diff_fe_n_out_features, diff_fe_n_base_features)
         self.integrator = tfp.math.ode.DormandPrince(rtol=int_rtol, atol=int_atol, max_num_steps=int_max_steps_per_step * self.n_time_step)
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
 
