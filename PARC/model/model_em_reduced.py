@@ -103,14 +103,27 @@ class PARCv2(keras.Model):
 
         state_var_gt = tf.cast(data[1][0], dtype = tf.float32)
         velocity_gt = tf.cast(data[1][1], dtype = tf.float32)
+        gt = Concatenate(axis = -1)([state_var_gt, velocity_gt])
 
         with tf.GradientTape() as tape:
             tape.watch(self.differentiator.trainable_weights)
-            results = self.integrator.solve(self._int_diff_call, 0.0, input_seq, solution_times=self.t_eval)
-            state_pred, vel_pred = results.states[:, :, :, :, :self.n_state_var], results.states[:, :, :, :, self.n_state_var:]
-            total_loss  = (tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(state_pred, state_var_gt) + 
-                           tf.keras.losses.MeanAbsoluteError(reduction = 'sum')(vel_pred, velocity_gt)) / 2
-            
+            #results = self.integrator.solve(self._int_diff_call, 0.0, input_seq, solution_times=self.t_eval)
+            #state_pred, vel_pred = results.states[:, :, :, :, :self.n_state_var], results.states[:, :, :, :, self.n_state_var:]
+            results = []
+            input_seq_current = input_seq
+            for _ in range(self.n_time_step):
+                k1 = self.differentiator(input_seq_current)
+                inp_k2 = input_seq_current + self.step_size*1/2*k1 
+                k2 = self.differentiator(inp_k2)
+                inp_k3 = input_seq_current + self.step_size*1/2*k2
+                k3 = self.differentiator(inp_k3)
+                inp_k4 = input_seq_current + self.step_size*k3
+                k4 = self.differentiator(inp_k4)
+                update = 1.0/6*(k1 + 2*k2 + 2*k3 + k4)
+                input_seq_current = input_seq_current + self.step_size*update
+                results.append(input_seq_current)
+            total_loss = tf.keras.losses.MeanAbsoluteError(reduction='sum')(results, gt) / 2
+        
         grads = tape.gradient(total_loss, self.differentiator.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.differentiator.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
