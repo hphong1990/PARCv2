@@ -116,8 +116,8 @@ class SPADE(layers.Layer):
     def call(self, input_tensor, raw_mask):
         with tf.device('/GPU:0'):
 
-            mask = tf.image.resize(raw_mask, self.resize_shape, method="nearest")
-            mask = tf.pad(mask, tf.constant([[0, 0], [1, 1], [1, 1], [0, 0]]), self.padding)
+            #mask = tf.image.resize(raw_mask, self.resize_shape, method="nearest")
+            mask = tf.pad(raw_mask, tf.constant([[0, 0], [1, 1], [1, 1], [0, 0]]), self.padding)
             x = self.conv(mask)    
 
             x = tf.pad(x, tf.constant([[0, 0], [1, 1], [1, 1], [0, 0]]), self.padding)

@@ -80,23 +80,33 @@ class PARCv2(keras.Model):
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.data_loss_tracker = keras.metrics.Mean(name="data_loss")
         self.ke_loss_tracker = keras.metrics.Mean(name="ke_loss")
+        '''
         self.jfn_loss_tracker = keras.metrics.Mean(name="jfn_loss")
+        '''
         self.nfe_tracker = keras.metrics.Sum(name="nfe")
         self.loss_ke = loss_ke
         self.loss_jfn = loss_jfn
 
     @property
     def metrics(self):
+        '''
         return [self.total_loss_tracker, self.data_loss_tracker, self.ke_loss_tracker, self.jfn_loss_tracker, self.nfe_tracker]
+        '''
+        return [self.total_loss_tracker, self.data_loss_tracker, self.ke_loss_tracker, self.nfe_tracker]
     
     def _int_diff_call(self, t, y):
         x = y[0]
+        '''
         ems = tf.random.normal([1] + x.shape[1:])
+        xx = tf.stop_gradient(x)
         with tf.GradientTape(persistent=True, watch_accessed_variables=False) as tape:
-            tape.watch(x)
-            f = tf.cast(self.differentiator(x), dtype=tf.float32)
-        jfn = tape.gradient(f, x, ems)
+            tape.watch(xx)
+            f = tf.cast(self.differentiator(xx), dtype=tf.float32)
+        jfn = tape.gradient(f, xx, ems)
         return [f, f*f, jfn*jfn]
+        '''
+        f = tf.cast(self.differentiator(x), dtype=tf.float32)
+        return [f, f*f]
     
     @tf.function
     def call(self, input):
@@ -116,19 +126,28 @@ class PARCv2(keras.Model):
         velocity_gt = tf.cast(data[1][1], dtype=tf.float32)
         gt = Concatenate(axis=-1)([state_var_gt, velocity_gt])
 
+        '''
         y0 = [input_seq, tf.zeros_like(input_seq), tf.zeros_like(input_seq)]
+        '''
+        y0 = [input_seq, tf.zeros_like(input_seq)]
         with tf.GradientTape() as tape:
             tape.watch(self.differentiator.trainable_weights)
             int_output = self.integrator.solve(self._int_diff_call, 0.0, y0, solution_times=self.t_eval)
             # Data loss
+            '''
             results, ke, jfn = int_output.states
+            '''
+            results, ke = int_output.states
             data_loss = tf.keras.losses.MeanAbsoluteError(reduction='sum')(results, gt)
             # Regularization loss
             ke_loss = tf.reduce_sum(ke)
+            '''
             # Jacobian F norm loss
             jfn_loss = tf.reduce_sum(jfn)
             # Total loss with regularization
             total_loss  = data_loss + self.loss_ke * ke_loss + self.loss_jfn * jfn_loss
+            '''
+            total_loss  = data_loss + self.loss_ke * ke_loss
             
         grads = tape.gradient(total_loss, self.differentiator.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.differentiator.trainable_weights))
@@ -136,13 +155,15 @@ class PARCv2(keras.Model):
         self.total_loss_tracker.update_state(total_loss)
         self.data_loss_tracker.update_state(data_loss)
         self.ke_loss_tracker.update_state(ke_loss)
+        '''
         self.jfn_loss_tracker.update_state(jfn_loss)
+        '''
         self.nfe_tracker.update_state(int_output.diagnostics.num_ode_fn_evaluations)
 
         return {
             "total_loss": self.total_loss_tracker.result(),
             "data_loss": self.data_loss_tracker.result(),
             "ke_loss": self.ke_loss_tracker.result(),
-            "jfn_loss": self.jfn_loss_tracker.result(),
+            #"jfn_loss": self.jfn_loss_tracker.result(),
             "nfe": self.nfe_tracker.result()
         }

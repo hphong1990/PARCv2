@@ -15,6 +15,8 @@ def dat2npy(metalearning_dir, species, data_shape=(600, 1000), timesteps=60,
         if not os.path.isdir(sim_dir):
             continue
         sim_id = os.path.basename(os.path.normpath(sim_dir))
+        if sim_id == "time":
+            continue
         if ((not overwrite) and os.path.isfile(os.path.join(data_dir, sim_id + ".npy"))):
             print("Simulation ID %s has been converted and will not be overwritten." % sim_id)
             continue
@@ -62,3 +64,53 @@ def load_tfdataset(simnpy_list, seq=2, n_state_var=3):
         else:
             tfds = tfds.concatenate(tfds_tmp)
     return tfds
+
+
+# reaction.dat in tatb format
+def reaction_dat_tatb(filename, timeskips, timesteps):
+    reaction_dat = np.genfromtxt(filename, skip_header=2, usecols=(0, 1))[::4, :]
+    # Sanity check
+    assert reaction_dat.shape[0] == 60000
+    assert reaction_dat.shape[1] == 2
+    # Filter out based on timeskips
+    timesteps = np.array([1] + [i * timeskips for i in range(1, timesteps)])
+    mask = np.isin(reaction_dat[:, 1], timesteps)
+    ts = reaction_dat[mask, 0]
+    # Average delta_t and min/max deviation
+    dt = np.diff(ts)
+    ts_mean = np.mean(dt)
+    print("delta_t Mean: %.4e Max +%.2f%% Min -%.2f%%" % (ts_mean, (np.max(dt) - ts_mean)/ts_mean * 100.0, (ts_mean - np.min(dt))/ts_mean * 100.0))
+    return ts
+
+
+# reaction.dat in HMX format
+def reaction_dat_hmx(filename, timeskips, timesteps):
+    reaction_dat = np.genfromtxt(filename, skip_header=1, usecols=(0, 1))
+    # Sanity check
+    assert reaction_dat.shape[0] == 60000
+    assert reaction_dat.shape[1] == 2
+    # Filter out based on timeskips
+    timesteps = np.array([1] + [i * timeskips for i in range(1, timesteps)])
+    mask = np.isin(reaction_dat[:, 1], timesteps)
+    ts = reaction_dat[mask, 0]
+    # Average delta_t and min/max deviation
+    dt = np.diff(ts)
+    ts_mean = np.mean(dt)
+    print("delta_t Mean: %.4e Max +%.2f%% Min -%.2f%%" % (ts_mean, (np.max(dt) - ts_mean)/ts_mean * 100.0, (ts_mean - np.min(dt))/ts_mean * 100.0))
+    return ts
+
+
+def dat2npy_time(metalearning_dir, species, parsing_func, timesteps=60, timeskips=1000, overwrite=False):
+    data_dir = os.path.join(metalearning_dir, species)
+    simulations_dir = glob.glob(os.path.join(data_dir, "*"))
+    for sim_dir in simulations_dir:
+        if not os.path.isdir(sim_dir):
+            continue
+        sim_id = os.path.basename(os.path.normpath(sim_dir))
+        if ((not overwrite) and os.path.isfile(os.path.join(data_dir, sim_id + "_t.npy"))):
+            print("Simulation ID %s has been converted and will not be overwritten." % sim_id)
+            continue
+        print("Begin processing Simulation ID %s Reaction.dat" % sim_id)
+        ts = parsing_func(os.path.join(sim_dir, "Reaction.dat"), timeskips, timesteps)
+        os.makedirs(os.path.join(data_dir, "time"), exist_ok=True)
+        np.save(os.path.join(data_dir, "time", sim_id + "_t.npy"), ts)
