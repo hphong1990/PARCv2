@@ -66,7 +66,7 @@ def differentiator_em(image_size, n_state_var, n_out_features, n_base_features):
 
 class PARCv2(keras.Model):
     def __init__(self, n_state_var, n_time_step, step_size, image_size=(0, 0), 
-                 int_rtol=1e-3, int_atol=1e-6,
+                 int_rtol=1e-3, int_atol=1e-6, int_minstep=0.1, int_maxstep=10.0,
                  diff_fe_n_out_features=32, diff_fe_n_base_features=[16],
                  loss_ke=1e-2, loss_jfn=1e-2,
                  **kwargs):
@@ -76,7 +76,8 @@ class PARCv2(keras.Model):
         self.step_size = step_size
         self.t_eval = tf.linspace(1, n_time_step, n_time_step) * step_size
         self.differentiator = differentiator_em(image_size, n_state_var, diff_fe_n_out_features, diff_fe_n_base_features)
-        self.integrator = tfp.math.ode.DormandPrince(rtol=int_rtol, atol=int_atol, first_step_size=step_size)
+        self.integrator = tfp.math.ode.DormandPrince(rtol=int_rtol, atol=int_atol, first_step_size=step_size,
+                                                     min_step_size_factor=int_minstep, max_step_size_factor=int_maxstep)
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.data_loss_tracker = keras.metrics.Mean(name="data_loss")
         self.ke_loss_tracker = keras.metrics.Mean(name="ke_loss")
@@ -108,22 +109,29 @@ class PARCv2(keras.Model):
         f = tf.cast(self.differentiator(x), dtype=tf.float32)
         return [f, f*f]
     
+    def _int_diff_call_infer(self, t, y):
+        return tf.cast(self.differentiator(y), dtype=tf.float32)
+    
     @tf.function
     def call(self, input):
         state_var_init = tf.cast(input[0], dtype=tf.float32)
         velocity_init = tf.cast(input[1], dtype=tf.float32)
+        t0 = tf.cast(input[2], dtype=tf.float32)
+        sol_time = tf.cast(input[3], dtype=tf.float32)
         ic = Concatenate(axis = -1)([state_var_init, velocity_init])
-        res = self.integrator.solve(self._int_diff_call, 0.0, ic, solution_times=self.t_eval)
+        res = self.integrator.solve(self._int_diff_call_infer, 0.0, ic, solution_times=sol_time-t0)
         return res
 
     @tf.function
     def train_step(self, data):
         state_var_init = tf.cast(data[0][0], dtype=tf.float32)
         velocity_init = tf.cast(data[0][1], dtype=tf.float32)
+        t0 = tf.cast(data[0][2], dtype=tf.float32)
         input_seq = Concatenate(axis=-1)([state_var_init, velocity_init])
 
         state_var_gt = tf.cast(data[1][0], dtype=tf.float32)
         velocity_gt = tf.cast(data[1][1], dtype=tf.float32)
+        t1 = tf.reshape(tf.cast(data[1][2], dtype=tf.float32), [-1])
         gt = Concatenate(axis=-1)([state_var_gt, velocity_gt])
 
         '''
@@ -132,7 +140,7 @@ class PARCv2(keras.Model):
         y0 = [input_seq, tf.zeros_like(input_seq)]
         with tf.GradientTape() as tape:
             tape.watch(self.differentiator.trainable_weights)
-            int_output = self.integrator.solve(self._int_diff_call, 0.0, y0, solution_times=self.t_eval)
+            int_output = self.integrator.solve(self._int_diff_call, 0.0, y0, solution_times=t1-t0)
             # Data loss
             '''
             results, ke, jfn = int_output.states

@@ -52,19 +52,23 @@ def dat2npy(metalearning_dir, species, data_shape=(600, 1000), timesteps=60,
         
 def load_tfdataset(simnpy_list, seq=2, n_state_var=3):
     for idx, each_sim in enumerate(simnpy_list):
+        # Look for time file
+        sim_id = os.path.basename(os.path.normpath(each_sim))
+        ts = np.load(os.path.normpath(os.path.join(each_sim, "..", "..", "time", sim_id)))
+        tfds_ts = tf.data.Dataset.from_tensor_slices(ts).window(seq, shift=1, drop_remainder=True).flat_map(lambda window: window.batch(seq))
+        # Simulation data
         tmp = np.load(each_sim)
-        tfds_tmp = tf.data.Dataset.from_tensor_slices(tmp)
-        tfds_tmp = tfds_tmp.window(seq, shift=1, drop_remainder=True)
-        tfds_tmp = tfds_tmp.flat_map(lambda window: window.batch(seq))
-        tfds_tmp = tfds_tmp.map(lambda window: 
-                                ((window[0, :, :, :n_state_var], window[0, :, :, n_state_var:]),
-                                 (window[1:, :, :, :n_state_var], window[1:, :, :, n_state_var:])))
+        tfds_tmp = tf.data.Dataset.from_tensor_slices(tmp).window(seq, shift=1, drop_remainder=True).flat_map(lambda window: window.batch(seq))
+        # Zip and split out the first
+        tfds_tmp = tf.data.Dataset.zip(tfds_tmp, tfds_ts)
+        tfds_tmp = tfds_tmp.map(lambda tmp, ts: 
+                                ((tmp[0, :, :, :n_state_var], tmp[0, :, :, n_state_var:], ts[0]),
+                                 (tmp[1:, :, :, :n_state_var], tmp[1:, :, :, n_state_var:], ts[1:])))
         if idx == 0:
             tfds = tfds_tmp
         else:
             tfds = tfds.concatenate(tfds_tmp)
     return tfds
-
 
 # reaction.dat in tatb format
 def reaction_dat_tatb(filename, timeskips, timesteps):
