@@ -26,11 +26,13 @@
 PARCv2 has been extensively validated on multiple benchmark problems and real-world applications:
 
 <h3> Standard Benchmark Problems </h3>
+
 - **2D Burgers' Equation**: Nonlinear advection-diffusion dynamics with shock formation
 - **2D Navier-Stokes Equations**: Unsteady fluid flow with complex vortical structures
 - **Comparative Performance**: Demonstrated superior performance compared to physics-informed neural networks (PINNs) and other learning bias models
 
 <h3> Complex Physics Applications </h3>
+
 - **Shock-Induced Reaction Problems**: Modeling energetic materials under extreme conditions
 - **Advection-Dominated Regimes**: Successful handling of challenging advection-dominant flows
 - **Multi-Scale Dynamics**: Capable of capturing both fast transient and long-term evolution
