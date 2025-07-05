@@ -100,12 +100,12 @@ The datasets used in this work are available for download to ensure reproducibil
 This repository also includes baseline implementations for comparison studies:
 
 **Fourier Neural Operator (FNO) Baselines:**
-- `Related_Work (Baseline)/fno/` - FNO implementations for different physics problems
+- `related-work-baseline/fno/` - FNO implementations for different physics problems
 - Physics-Informed FNO (PIFNO) variants included
 - Configuration files for reproducing baseline results
 
 **PARC Neural ODE Comparisons:**
-- `Related_Work (Baseline)/parc_neuralode/` - Neural ODE implementations
+- `related-work-baseline/parc_neuralode/` - Neural ODE implementations
 - Pre-trained models for direct performance comparison
 - Jupyter notebooks for result reproduction
 
