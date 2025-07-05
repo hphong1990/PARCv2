@@ -1,7 +1,8 @@
 <h1><a href="https://arxiv.org/abs/2402.12503">PARCv2: Physics-aware Recurrent Convolutional Neural Networks for Spatiotemporal Dynamics Modeling</a></h1>
 <h3>Phong C.H. Nguyen, Xinlun Cheng, Shahab Azarfar, Pradeep Seshadri, Yen T. Nguyen, Munho Kim, Sanghun Choi, H.S. Udaykumar, Stephen Baek</h3>
 
-**Published at:** *Proceedings of the 41st International Conference on Machine Learning (ICML 2024)*  
+## Published at
+*Proceedings of the 41st International Conference on Machine Learning (ICML 2024)*  
 **Pages:** 37649-37666  
 **Links:** [ICML Proceedings](https://proceedings.mlr.press/v235/nguyen24c.html) | [PDF](https://raw.githubusercontent.com/mlresearch/v235/main/assets/nguyen24c/nguyen24c.pdf) | [OpenReview](https://openreview.net/forum?id=T0zR4mdSce) | [arXiv](https://arxiv.org/abs/2402.12503)
 
